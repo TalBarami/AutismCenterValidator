@@ -16,11 +16,24 @@ class Validator:
     def __init__(self, videos_path, skeletons_path, out_path, skeleton_layout):
         self.videos_path = videos_path
         self.skeletons_path = skeletons_path
-        self.files = [(path.splitext(name)[0], path.join(videos_path, name), path.join(skeletons_path, f'{path.splitext(name)[0]}.json')) for name in os.listdir(videos_path) if path.isfile(path.join(skeletons_path, f'{path.splitext(name)[0]}.json'))]
+        self.files = [(path.splitext(name)[0], path.join(videos_path, name), path.join(skeletons_path, f'{path.splitext(name)[0]}.json')) for name in os.listdir(videos_path) if
+                      path.isfile(path.join(skeletons_path, f'{path.splitext(name)[0]}.json'))]
         self.out_path = out_path
         self.df = pd.read_csv(out_path) if path.isfile(out_path) else pd.DataFrame(columns=['video_name', 'segment_name', 'start_time', 'end_time', 'start_frame', 'end_frame', 'status', 'action', 'child_ids', 'notes'])
         self.executor = ThreadPoolExecutor()
         self.skeleton_layout = skeleton_layout
+        self.idx = 0
+        self.speed = 1
+        self.globals = {
+            'back': (lambda: self.back()),
+            'speed': (lambda i: self.set_speed(i))
+        }
+
+    def back(self):
+        self.idx -= 1
+
+    def set_speed(self, i):
+        self.speed = i
 
     def choose(self, msg, lst, offset=1):
         while True:
@@ -28,8 +41,8 @@ class Validator:
             for i, e in enumerate(lst):
                 print(f'{i + offset}. {e}')
             result = input()
-            # if result.startswith('-'):
-            #     return False, -1  # TODO: Global commands
+            if result.startswith('-'):
+                raise GlobalCommandEvent(result[1:].split(' '))
             result = [s for s in result.split(' ') if s]
             if all(s.isdigit() and (offset <= int(s) < len(lst) + offset) for s in result):
                 result = [int(s) - offset for s in result]
@@ -59,7 +72,7 @@ class Validator:
                             2,
                             (0, 255, 0),
                             5)
-                sleep(1 / (2 * fps))
+                sleep(1 / (self.speed * fps))
                 cv2.imshow('skeleton', frame)
                 i += 1
             else:
@@ -84,33 +97,50 @@ class Validator:
             ans = self.choose('Choose label(s):', REAL_DATA_MOVEMENTS[:-1])
             result_labels = [REAL_DATA_MOVEMENTS[i] for i in ans]
             status = Status.OK if status == Status.WRONG_LABEL else Status.NO_SKELETON_WRONG_LABEL
+        if 'Other' in result_labels:
+            result_notes = input('Save notes: ')
         if status == Status.OK:
-            result_cids = self.choose('Choose child id(s):', [f'({COLORS[i % len(COLORS)]["name"]})' for i in range(max_id+1)], offset=0)
+            result_cids = self.choose('Choose child id(s):', [f'({COLORS[i % len(COLORS)]["name"]})' for i in range(max_id + 1)], offset=0)
 
         return status, result_labels, result_cids, result_notes
 
     def run(self):
-        for name, vpath, spath in self.files:
-            _df = self.df[self.df['segment_name'] == name]
-            if not _df.empty:  # and if the tagged row is not None / Skip / Whatever I decide
-                continue
+        tagged_data = set(self.df['segment_name'].unique())
+        while True:
+            try:
+                if len(tagged_data) == len(self.files):
+                    break
+                name, vpath, spath = self.files[self.idx]
+                self.idx += 1
 
-            skeleton = read_json(spath)['data']
-            max_id = np.max([s['person_id'] for v in skeleton for s in v['skeleton']])
-            split = name.split('_')
-            basename = '_'.join(split[:-3])
-            _, fps, _ = get_video_properties(vpath)
-            base_label, start_frame, end_frame = split[-3:]
-            start_frame, end_frame = int(start_frame), int(end_frame)
-            start_time, end_time = int(start_frame / fps), int(end_frame / fps)
+                _df = self.df[self.df['segment_name'] == name]
+                if not _df.empty:  # and if the tagged row is not None / Skip / Whatever I decide
+                    continue
 
-            print(f'Validating: {vpath}')
-            task = self.executor.submit(lambda: self.validate(base_label, max_id))
-            self.play(skeleton, vpath, base_label, task.done)
-            status, labels, cids, notes = task.result()
-            for label in labels:
-                self.df.loc[self.df.shape[0]] = [basename, name, start_time, end_time, start_frame, end_frame, status, label, cids, notes]
-                self.df.to_csv(self.out_path, index=False)
+                skeleton = read_json(spath)['data']
+                max_id = np.max([s['person_id'] for v in skeleton for s in v['skeleton']])
+                split = name.split('_')
+                basename = '_'.join(split[:-3])
+                _, fps, _ = get_video_properties(vpath)
+                base_label, start_frame, end_frame = split[-3:]
+                start_frame, end_frame = int(start_frame), int(end_frame)
+                start_time, end_time = int(start_frame / fps), int(end_frame / fps)
+
+                print(f'Validating: {vpath}')
+                task = self.executor.submit(lambda: self.validate(base_label, max_id))
+                self.play(skeleton, vpath, base_label, task.done)
+                status, labels, cids, notes = task.result()
+                for label in labels:
+                    self.df.loc[self.df.shape[0]] = [basename, name, start_time, end_time, start_frame, end_frame, status, label, cids, notes]
+                    self.df.to_csv(self.out_path, index=False)
+            except GlobalCommandEvent as g:
+                print(g)
+
+
+class GlobalCommandEvent(Exception):
+    def __init__(self, method, *args):
+        self.method = method
+        self.args = args
 
 
 # global_cmds = {
