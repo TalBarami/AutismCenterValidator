@@ -1,3 +1,4 @@
+from datetime import datetime
 from time import sleep
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
@@ -10,6 +11,11 @@ from os import path
 
 from utils import draw_json_skeletons, Status, REAL_DATA_MOVEMENTS, COLORS, BODY_25_LAYOUT, read_json, get_video_properties
 
+class Global:
+    def __init__(self, name, args_count, func_ref):
+        self.name = name
+        self.args_count = args_count
+        self.func_ref = func_ref
 
 class Validator:
 
@@ -19,21 +25,33 @@ class Validator:
         self.files = [(path.splitext(name)[0], path.join(videos_path, name), path.join(skeletons_path, f'{path.splitext(name)[0]}.json')) for name in os.listdir(videos_path) if
                       path.isfile(path.join(skeletons_path, f'{path.splitext(name)[0]}.json'))]
         self.out_path = out_path
-        self.df = pd.read_csv(out_path) if path.isfile(out_path) else pd.DataFrame(columns=['video_name', 'segment_name', 'start_time', 'end_time', 'start_frame', 'end_frame', 'status', 'action', 'child_ids', 'notes'])
+        self.df = pd.read_csv(out_path) if path.isfile(out_path) else pd.DataFrame(columns=['video_name', 'segment_name', 'start_time', 'end_time', 'start_frame', 'end_frame', 'status', 'action', 'child_ids', 'notes', 'time'])
         self.executor = ThreadPoolExecutor()
         self.skeleton_layout = skeleton_layout
         self.idx = 0
         self.speed = 1
-        self.globals = {
-            'back': (lambda: self.back()),
-            'speed': (lambda i: self.set_speed(i))
-        }
+        self.globals = {g.name: g for g in [Global('revert', 0, self.revert), Global('speed', 1, self.set_speed)]}
 
-    def back(self):
-        self.idx -= 1
+    def revert(self):
+        if self.idx > 1:
+            self.idx -= 1
+            self.df.drop(self.df.tail(1).index, inplace=True)
+            self.df.to_csv(self.out_path, index=False)
 
     def set_speed(self, i):
-        self.speed = i
+        try:
+            i = float(i)
+            if i < 0.5:
+                return
+            self.speed = i
+        except ValueError:
+            pass
+
+    def valid_global(self, str):
+        if not str.startswith('-') or len(str) < 2:
+            return False
+        cmd = str[1:].split(' ')
+        return any(g for g in self.globals.values() if len(cmd) == g.args_count+1 and cmd[0] == g.name)
 
     def choose(self, msg, lst, offset=1):
         while True:
@@ -41,8 +59,8 @@ class Validator:
             for i, e in enumerate(lst):
                 print(f'{i + offset}. {e}')
             result = input()
-            if result.startswith('-'):
-                raise GlobalCommandEvent(result[1:].split(' '))
+            if self.valid_global(result):
+                raise GlobalCommandEvent(*result[1:].split(' '))
             result = [s for s in result.split(' ') if s]
             if all(s.isdigit() and (offset <= int(s) < len(lst) + offset) for s in result):
                 result = [int(s) - offset for s in result]
@@ -72,7 +90,7 @@ class Validator:
                             2,
                             (0, 255, 0),
                             5)
-                sleep(1 / (self.speed * fps))
+                sleep(1 / (np.power(2, self.speed) * fps))
                 cv2.imshow('skeleton', frame)
                 i += 1
             else:
@@ -131,16 +149,20 @@ class Validator:
                 self.play(skeleton, vpath, base_label, task.done)
                 status, labels, cids, notes = task.result()
                 for label in labels:
-                    self.df.loc[self.df.shape[0]] = [basename, name, start_time, end_time, start_frame, end_frame, status, label, cids, notes]
+                    self.df.loc[self.df.shape[0]] = [basename, name, start_time, end_time, start_frame, end_frame, status, label, cids, notes, datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
                     self.df.to_csv(self.out_path, index=False)
             except GlobalCommandEvent as g:
-                print(g)
+                self.globals[g.method].func_ref(*g.args)
+                self.idx -= 1
 
 
 class GlobalCommandEvent(Exception):
     def __init__(self, method, *args):
         self.method = method
         self.args = args
+
+    def __str__(self):
+        return f'{self.method} {self.args}'
 
 
 # global_cmds = {
@@ -150,5 +172,5 @@ class GlobalCommandEvent(Exception):
 #     '-label': True,
 # }
 if __name__ == '__main__':
-    val = Validator('E:/Data/Hadas/segmented_videos', 'E:/Data/Hadas/skeletons/data', 'E:/Data/Hadas/skeletons/qa.csv', BODY_25_LAYOUT)
+    val = Validator('D:/segmented_videos', 'D:/skeletons/data', 'D:/skeletons/qa.csv', BODY_25_LAYOUT)
     val.run()
