@@ -30,8 +30,8 @@ class Validator:
             result = input()
             # if result.startswith('-'):
             #     return False, -1  # TODO: Global commands
-            result = result.split(' ')
-            if all(s.isdigit() and (offset <= int(s) < len(lst) + offset) for s in result if s):
+            result = [s for s in result.split(' ') if s]
+            if all(s.isdigit() and (offset <= int(s) < len(lst) + offset) for s in result):
                 result = [int(s) - offset for s in result]
                 return [i for i in result]
             print('Error: Wrong selection.')
@@ -120,5 +120,5 @@ class Validator:
 #     '-label': True,
 # }
 if __name__ == '__main__':
-    val = Validator('E:/Data/segmented_videos', 'E:/Data/skeletons/data', 'E:/Data/skeletons/qa.csv', BODY_25_LAYOUT)
+    val = Validator('E:/Data/Hadas/segmented_videos', 'E:/Data/Hadas/skeletons/data', 'E:/Data/Hadas/skeletons/qa.csv', BODY_25_LAYOUT)
     val.run()
