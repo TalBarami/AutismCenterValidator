@@ -23,7 +23,7 @@ class Validator:
         self.videos_path = videos_path
         self.skeletons_path = skeletons_path
         self.files = [(path.splitext(name)[0], path.join(videos_path, name), path.join(skeletons_path, f'{path.splitext(name)[0]}.json')) for name in os.listdir(videos_path) if
-                      path.isfile(path.join(skeletons_path, f'{path.splitext(name)[0]}.json'))]
+                      path.isfile(path.join(skeletons_path, f'{path.splitext(name)[0]}.json')) and (name.startswith('2') or name.startswith('9'))]
         self.out_path = out_path
         self.df = pd.read_csv(out_path) if path.isfile(out_path) else pd.DataFrame(columns=['video_name', 'segment_name', 'start_time', 'end_time', 'start_frame', 'end_frame', 'status', 'action', 'child_ids', 'notes', 'time'])
         self.executor = ThreadPoolExecutor()
@@ -62,7 +62,7 @@ class Validator:
             if self.valid_global(result):
                 raise GlobalCommandEvent(*result[1:].split(' '))
             result = [s for s in result.split(' ') if s]
-            if all(s.isdigit() and (offset <= int(s) < len(lst) + offset) for s in result):
+            if len(result) > 0 and all(s.isdigit() and (offset <= int(s) < len(lst) + offset) for s in result):
                 result = [int(s) - offset for s in result]
                 return [i for i in result]
             print('Error: Wrong selection.')
@@ -78,14 +78,19 @@ class Validator:
                 draw_json_skeletons(frame, skeleton[i]['skeleton'], (width, height), self.skeleton_layout, normalized=True)
                 if i < 10:
                     cv2.putText(frame, 'Reset',
-                                (int(width * 4 / 10), int(height / 2)),
+                                (int(width * 0.5), int(height * 0.5)),
                                 cv2.FONT_HERSHEY_SIMPLEX,
                                 3,
                                 (0, 0, 255),
                                 5)
-
+                cv2.putText(frame, f'{i}/{len(skeleton)}',
+                            (int(width * 0.05), int(height * 0.95)),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            1,
+                            (100, 30, 255),
+                            2)
                 cv2.putText(frame, label,
-                            (int(width * 4 / 10), int(height * 1 / 10)),
+                            (int(width * 0.4), int(height * 0.1)),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             2,
                             (0, 255, 0),
@@ -112,7 +117,7 @@ class Validator:
         if status == Status.SKIP:
             result_notes = input('Save notes: ')
         if status in [Status.WRONG_LABEL, Status.NO_SKELETON_WRONG_LABEL]:
-            ans = self.choose('Choose label(s):', REAL_DATA_MOVEMENTS[:-1])
+            ans = self.choose('Choose label(s):', REAL_DATA_MOVEMENTS)
             result_labels = [REAL_DATA_MOVEMENTS[i] for i in ans]
             status = Status.OK if status == Status.WRONG_LABEL else Status.NO_SKELETON_WRONG_LABEL
         if 'Other' in result_labels:
