@@ -1,4 +1,5 @@
 from datetime import datetime
+from pathlib import Path
 from time import sleep
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
@@ -19,13 +20,11 @@ class Global:
 
 class Validator:
 
-    def __init__(self, videos_path, skeletons_path, out_path, skeleton_layout):
-        self.videos_path = videos_path
-        self.skeletons_path = skeletons_path
-        self.files = [(path.splitext(name)[0], path.join(videos_path, name), path.join(skeletons_path, f'{path.splitext(name)[0]}.json')) for name in os.listdir(videos_path) if
-                      path.isfile(path.join(skeletons_path, f'{path.splitext(name)[0]}.json')) and (name.startswith('2') or name.startswith('9'))]
-        self.out_path = out_path
-        self.df = pd.read_csv(out_path) if path.isfile(out_path) else pd.DataFrame(columns=['video_name', 'segment_name', 'start_time', 'end_time', 'start_frame', 'end_frame', 'status', 'action', 'child_ids', 'notes', 'time'])
+    def __init__(self, files, skeleton_layout):
+        Path('resources/').mkdir(parents=True, exist_ok=True)
+        self.files = files
+        self.out_path = 'resources/qa.csv'
+        self.df = pd.read_csv(self.out_path) if path.isfile(self.out_path) else pd.DataFrame(columns=['video_name', 'segment_name', 'start_time', 'end_time', 'start_frame', 'end_frame', 'status', 'action', 'child_ids', 'time', 'notes'])
         self.executor = ThreadPoolExecutor()
         self.skeleton_layout = skeleton_layout
         self.idx = 0
@@ -67,15 +66,15 @@ class Validator:
                 return [i for i in result]
             print('Error: Wrong selection.')
 
-    def play(self, skeleton, video_path, label, done):
+    def play(self, video_path, skeleton=None, label=None, done=None):
         cap = cv2.VideoCapture(video_path)
-        width, height, fps = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT), cap.get(cv2.CAP_PROP_FPS)
+        width, height, fps, length = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT), cap.get(cv2.CAP_PROP_FPS), cap.get(cv2.CAP_PROP_FRAME_COUNT)
         i = 0
         while True:
             ret, frame = cap.read()
-            if ret and i < len(skeleton):
-                # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-                draw_json_skeletons(frame, skeleton[i]['skeleton'], (width, height), self.skeleton_layout, normalized=True)
+            if ret:
+                if skeleton is not None and i < len(skeleton):
+                    draw_json_skeletons(frame, skeleton[i]['skeleton'], (width, height), self.skeleton_layout, normalized=True)
                 if i < 10:
                     cv2.putText(frame, 'Reset',
                                 (int(width * 0.5), int(height * 0.5)),
@@ -83,26 +82,26 @@ class Validator:
                                 3,
                                 (0, 0, 255),
                                 5)
-                cv2.putText(frame, f'{i}/{len(skeleton)}',
+                cv2.putText(frame, f'{i}/{length}',
                             (int(width * 0.05), int(height * 0.95)),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             1,
                             (100, 30, 255),
                             2)
-                cv2.putText(frame, label,
-                            (int(width * 0.4), int(height * 0.1)),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            2,
-                            (0, 255, 0),
-                            5)
+                if label is not None:
+                    cv2.putText(frame, label,
+                                (int(width * 0.4), int(height * 0.1)),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                2,
+                                (0, 255, 0),
+                                5)
                 sleep(1 / (np.power(2, self.speed) * fps))
                 cv2.imshow('skeleton', frame)
                 i += 1
             else:
                 i = 0
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0.0)
-
-            if done() or (cv2.waitKey(1) & 0xFF == ord('q')):
+            if (done and done()) or (cv2.waitKey(1) & 0xFF == ord('q')):
                 break
         cap.release()
 
@@ -120,7 +119,7 @@ class Validator:
             ans = self.choose('Choose label(s):', REAL_DATA_MOVEMENTS)
             result_labels = [REAL_DATA_MOVEMENTS[i] for i in ans]
             status = Status.OK if status == Status.WRONG_LABEL else Status.NO_SKELETON_WRONG_LABEL
-        if 'Other' in result_labels:
+        if status != Status.SKIP and 'Other' in result_labels:
             result_notes = input('Save notes: ')
         if status == Status.OK:
             result_cids = self.choose('Choose child id(s):', [f'({COLORS[i % len(COLORS)]["name"]})' for i in range(max_id + 1)], offset=0)
@@ -140,8 +139,8 @@ class Validator:
                 if not _df.empty:  # and if the tagged row is not None / Skip / Whatever I decide
                     continue
 
-                skeleton = read_json(spath)['data']
-                max_id = np.max([s['person_id'] for v in skeleton for s in v['skeleton']])
+                skeleton = read_json(spath)['data'] if spath else None
+                max_id = np.max([s['person_id'] for v in skeleton for s in v['skeleton']]) if spath else 0
                 split = name.split('_')
                 basename = '_'.join(split[:-3])
                 _, fps, _ = get_video_properties(vpath)
@@ -151,10 +150,10 @@ class Validator:
 
                 print(f'Validating: {vpath}')
                 task = self.executor.submit(lambda: self.validate(base_label, max_id))
-                self.play(skeleton, vpath, base_label, task.done)
+                self.play(vpath, skeleton=skeleton, label=base_label, done=task.done)
                 status, labels, cids, notes = task.result()
                 for label in labels:
-                    self.df.loc[self.df.shape[0]] = [basename, name, start_time, end_time, start_frame, end_frame, status, label, cids, notes, datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
+                    self.df.loc[self.df.shape[0]] = [basename, name, start_time, end_time, start_frame, end_frame, status, label, cids, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), notes]
                     self.df.to_csv(self.out_path, index=False)
             except GlobalCommandEvent as g:
                 self.globals[g.method].func_ref(*g.args)
@@ -177,5 +176,11 @@ class GlobalCommandEvent(Exception):
 #     '-label': True,
 # }
 if __name__ == '__main__':
-    val = Validator('D:/segmented_videos', 'D:/skeletons/data', 'D:/skeletons/qa.csv', BODY_25_LAYOUT)
+    videos_path = 'D:/segmented_videos'
+    skeletons_path = 'D:/skeletons/data'
+    # files = [(path.splitext(name)[0], path.join(videos_path, name), path.join(skeletons_path, f'{path.splitext(name)[0]}.json')) for name in os.listdir(videos_path) if
+    #               path.isfile(path.join(skeletons_path, f'{path.splitext(name)[0]}.json'))]
+    bad = read_json('C:/Users/owner/PycharmProjects/RepetitiveMotionRecognition/resources/qa/bad_files.json')
+    files = [(path.splitext(name)[0], path.join(videos_path, name), None) for name in os.listdir(videos_path) if path.splitext(name)[0] in bad]
+    val = Validator(files, BODY_25_LAYOUT)
     val.run()
