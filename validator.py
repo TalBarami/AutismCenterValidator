@@ -119,7 +119,7 @@ class Validator:
             ans = self.choose('Choose label(s):', REAL_DATA_MOVEMENTS)
             result_labels = [REAL_DATA_MOVEMENTS[i] for i in ans]
             status = Status.OK if status == Status.WRONG_LABEL else Status.NO_SKELETON_WRONG_LABEL
-        if status != Status.SKIP and 'Other' in result_labels:
+        if status != Status.SKIP and status != Status.NO_ACTION_OBSERVED and 'Other' in result_labels:
             result_notes = input('Save notes: ')
         if status == Status.OK:
             result_cids = self.choose('Choose child id(s):', [f'({COLORS[i % len(COLORS)]["name"]})' for i in range(max_id + 1)], offset=0)
