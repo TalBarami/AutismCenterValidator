@@ -28,8 +28,10 @@ class Validator:
         self.executor = ThreadPoolExecutor()
         self.skeleton_layout = skeleton_layout
         self.idx = 0
+        self.n = len(files)
         self.speed = 1
-        self.globals = {g.name: g for g in [Global('revert', 0, self.revert), Global('speed', 1, self.set_speed)]}
+        self.globals = {g.name: g for g in [Global('revert', 0, self.revert), Global('speed', 1, self.set_speed), Global('resolution', 2, self.set_resolution)]}
+        self.resolution = (1000, 600)
 
     def revert(self):
         if self.idx > 1:
@@ -45,6 +47,9 @@ class Validator:
             self.speed = i
         except ValueError:
             pass
+
+    def set_resolution(self, width, height):
+        self.resolution = (int(width), int(height))
 
     def valid_global(self, str):
         if not str.startswith('-') or len(str) < 2:
@@ -68,11 +73,13 @@ class Validator:
 
     def play(self, video_path, skeleton=None, label=None, done=None):
         cap = cv2.VideoCapture(video_path)
-        width, height, fps, length = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT), cap.get(cv2.CAP_PROP_FPS), cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        fps, length = cap.get(cv2.CAP_PROP_FPS), cap.get(cv2.CAP_PROP_FRAME_COUNT)
         i = 0
         while True:
+            width, height = self.resolution
             ret, frame = cap.read()
             if ret:
+                frame = cv2.resize(frame, (width, height))
                 if skeleton is not None and i < len(skeleton):
                     draw_json_skeletons(frame, skeleton[i]['skeleton'], (width, height), self.skeleton_layout, normalized=True)
                 if i < 10:
@@ -88,6 +95,12 @@ class Validator:
                             1,
                             (100, 30, 255),
                             2)
+                cv2.putText(frame, f'{self.idx}/{self.n}',
+                            (int(width * 0.05), int(height * 0.05)),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            1,
+                            (100, 30, 255),
+                            2)
                 if label is not None:
                     cv2.putText(frame, label,
                                 (int(width * 0.4), int(height * 0.1)),
@@ -95,7 +108,8 @@ class Validator:
                                 2,
                                 (0, 255, 0),
                                 5)
-                sleep(1 / (np.power(2, self.speed) * fps))
+                if self.speed <= 4:
+                    sleep(1 / (np.power(2, self.speed) * fps))
                 cv2.imshow('skeleton', frame)
                 i += 1
             else:
@@ -130,8 +144,8 @@ class Validator:
         tagged_data = set(self.df['segment_name'].unique())
         while True:
             try:
-                if len(tagged_data) == len(self.files):
-                    break
+                # if len(tagged_data) >= len(self.files):
+                #     break
                 name, vpath, spath = self.files[self.idx]
                 self.idx += 1
 
