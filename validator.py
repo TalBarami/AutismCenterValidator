@@ -144,8 +144,8 @@ class Validator:
         tagged_data = set(self.df['segment_name'].unique())
         while True:
             try:
-                # if len(tagged_data) >= len(self.files):
-                #     break
+                if set([f[0] for f in self.files]).issubset(tagged_data):
+                    break
                 name, vpath, spath = self.files[self.idx]
                 self.idx += 1
 
