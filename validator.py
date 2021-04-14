@@ -29,7 +29,7 @@ class Validator:
         self.skeleton_layout = skeleton_layout
         self.idx = 0
         self.n = len(files)
-        self.speed = 100
+        self.speed = 1
         self.globals = {g.name: g for g in [Global('revert', 0, self.revert), Global('speed', 1, self.set_speed), Global('resolution', 2, self.set_resolution), Global('reset', 0, self.reset)]}
         self.resolution = (1000, 600)
 
@@ -188,14 +188,11 @@ class GlobalCommandEvent(Exception):
 
 
 if __name__ == '__main__':
-    videos_path = 'E:/dataset/segmented_videos'
-    skeletons_path = 'E:/dataset/skeletons/data'
-    files = [(path.splitext(name)[0], path.join(videos_path, name), path.join(skeletons_path, f'{path.splitext(name)[0]}.json')) for name in os.listdir(videos_path) if
-                  name.startswith('1') and
-                  path.isfile(path.join(skeletons_path, f'{path.splitext(name)[0]}.json'))]
-    files = [f for f in files if 'NoAction' not in f[0] or int(f[0].split('_')[0]) % 2 == 0]
-
-    # bad = read_json('C:/Users/owner/PycharmProjects/RepetitiveMotionRecognition/resources/qa/bad_files.json')
-    # files = [(path.splitext(name)[0], path.join(videos_path, name), None) for name in os.listdir(videos_path) if path.splitext(name)[0] in bad]
+    videos_path = 'D:/segmented_videos'
+    skeletons_path = 'D:/skeletons/data'
+    # files = [(path.splitext(name)[0], path.join(videos_path, name), path.join(skeletons_path, f'{path.splitext(name)[0]}.json')) for name in os.listdir(videos_path) if
+    #               path.isfile(path.join(skeletons_path, f'{path.splitext(name)[0]}.json'))]
+    bad = read_json('C:/Users/owner/PycharmProjects/RepetitiveMotionRecognition/resources/qa/bad_files.json')
+    files = [(path.splitext(name)[0], path.join(videos_path, name), None) for name in os.listdir(videos_path) if path.splitext(name)[0] in bad]
     val = Validator(files, BODY_25_LAYOUT)
     val.run()
