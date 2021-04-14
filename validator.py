@@ -29,7 +29,7 @@ class Validator:
         self.skeleton_layout = skeleton_layout
         self.idx = 0
         self.n = len(files)
-        self.speed = 1
+        self.speed = 100
         self.globals = {g.name: g for g in [Global('revert', 0, self.revert), Global('speed', 1, self.set_speed), Global('resolution', 2, self.set_resolution), Global('reset', 0, self.reset)]}
         self.resolution = (1000, 600)
 
