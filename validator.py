@@ -30,7 +30,7 @@ class Validator:
         self.idx = 0
         self.n = len(files)
         self.speed = 1
-        self.globals = {g.name: g for g in [Global('revert', 0, self.revert), Global('speed', 1, self.set_speed), Global('resolution', 2, self.set_resolution)]}
+        self.globals = {g.name: g for g in [Global('revert', 0, self.revert), Global('speed', 1, self.set_speed), Global('resolution', 2, self.set_resolution), Global('reset', 0, self.reset)]}
         self.resolution = (1000, 600)
 
     def revert(self):
@@ -38,6 +38,9 @@ class Validator:
             self.idx -= 1
             self.df.drop(self.df.tail(1).index, inplace=True)
             self.df.to_csv(self.out_path, index=False)
+
+    def reset(self):
+        return
 
     def set_speed(self, i):
         try:
@@ -183,12 +186,7 @@ class GlobalCommandEvent(Exception):
         return f'{self.method} {self.args}'
 
 
-# global_cmds = {
-#     '-break': True,
-#     '-back': True,
-#     '-speed': True,
-#     '-label': True,
-# }
+
 if __name__ == '__main__':
     videos_path = 'D:/segmented_videos'
     skeletons_path = 'D:/skeletons/data'
