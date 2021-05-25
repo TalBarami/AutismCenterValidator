@@ -148,6 +148,7 @@ class Validator:
         while True:
             try:
                 if set([f[0] for f in self.files]).issubset(tagged_data):
+                    print(f'Finishd tagging {self.idx} files')
                     break
                 name, vpath, spath = self.files[self.idx]
                 self.idx += 1
