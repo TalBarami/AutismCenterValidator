@@ -26,6 +26,9 @@ class Status(Enum):
     NO_SKELETON_WRONG_LABEL = 'NO_SKELETON + WRONG_LABEL'
     SKIP = 'SKIP'
 
+class Resolution(Enum):
+    AUTO = 'AUTO'
+    MANUAL = 'MANUAL'
 
 class Global:
     def __init__(self, name, args_count, func_ref):
@@ -35,7 +38,6 @@ class Global:
 
 
 class Validator:
-
     def __init__(self, files, skeleton_layout):
         Path('resources/').mkdir(parents=True, exist_ok=True)
         self.files = files
@@ -47,7 +49,8 @@ class Validator:
         self.n = len(files)
         self.speed = 1
         self.globals = {g.name: g for g in [Global('revert', 0, self.revert), Global('speed', 1, self.set_speed), Global('resolution', 2, self.set_resolution), Global('reset', 0, self.reset)]}
-        self.resolution = (1400, 600)
+        self.resolution_method = Resolution.AUTO
+        self.resolution = (0, 0)
 
     def revert(self):
         if self.idx > 1:
@@ -68,7 +71,8 @@ class Validator:
             pass
 
     def set_resolution(self, width, height):
-        self.resolution = (int(width), int(height))
+        self.resolution = int(width), int(height)
+        self.resolution_method = Resolution.MANUAL if np.sum(self.resolution) > 0 else Resolution.AUTO
 
     def valid_global(self, str):
         if not str.startswith('-') or len(str) < 2:
@@ -90,12 +94,15 @@ class Validator:
                 return [i for i in result]
             print('Error: Wrong selection.')
 
+    def get_resolution(self, cap):
+        return self.resolution if self.resolution_method == Resolution.MANUAL else (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) / 2), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) / 2))
+
     def play(self, video_path, labels=None, done=None):
         cap = cv2.VideoCapture(video_path)
         fps, length = cap.get(cv2.CAP_PROP_FPS), cap.get(cv2.CAP_PROP_FRAME_COUNT)
         i = 0
         while True:
-            width, height = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) / 2), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) / 2)
+            width, height = self.get_resolution(cap)
             ret, frame = cap.read()
             if ret:
                 frame = cv2.resize(frame, (width, height))
@@ -202,7 +209,7 @@ class GlobalCommandEvent(Exception):
 
 
 if __name__ == '__main__':
-    root = r'D:\tagging_p2'
+    root = r'D:\datasets\tagging_ofri'
     videos_path = path.join(root, 'skeleton_videos')
     skeletons_path = path.join(root, 'skeletons')
     # labels = read_json('D:/skeletons/label.json')
