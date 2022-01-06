@@ -47,7 +47,7 @@ class Validator:
         self.skeleton_layout = skeleton_layout
         self.idx = 0
         self.n = len(files)
-        self.speed = 1
+        self.speed = 3
         self.globals = {g.name: g for g in [Global('revert', 0, self.revert), Global('speed', 1, self.set_speed), Global('resolution', 2, self.set_resolution), Global('reset', 0, self.reset)]}
         self.resolution_method = Resolution.AUTO
         self.resolution = (0, 0)
@@ -179,7 +179,7 @@ class Validator:
                     continue
 
                 skeleton = read_json(spath)['data'] if spath else None
-                max_id = np.max([s['person_id'] for v in skeleton for s in v['skeleton']]) if spath else 0
+                max_id = np.max([s['person_id'] for v in skeleton for s in v['skeleton']]) if spath and any([v['skeleton'] for v in skeleton]) else 0
                 split = name.split('_')
                 basename = '_'.join(split[:-3])
                 _, fps, _ = get_video_properties(vpath)
@@ -209,7 +209,7 @@ class GlobalCommandEvent(Exception):
 
 
 if __name__ == '__main__':
-    root = r'D:\datasets\tagging_ofri'
+    root = r'E:\QA\Ofri'
     videos_path = path.join(root, 'skeleton_videos')
     skeletons_path = path.join(root, 'skeletons')
     # labels = read_json('D:/skeletons/label.json')
