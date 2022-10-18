@@ -12,9 +12,9 @@ from os import path
 
 from skeleton_tools.utils.constants import REAL_DATA_MOVEMENTS, COLORS
 
-from skeleton_tools.utils.tools import get_video_properties, read_json
+from skeleton_tools.utils.tools import get_video_properties, read_json, read_pkl
 
-from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT
+from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT, COCO_LAYOUT
 
 
 class Status(Enum):
@@ -159,8 +159,8 @@ class Validator:
             status = Status.OK if status == Status.WRONG_LABEL else Status.NO_SKELETON_WRONG_LABEL
         if status != Status.SKIP and status != Status.NO_ACTION_OBSERVED and 'Other' in result_labels:
             result_notes = input('Save notes: ')
-        if status == Status.OK:
-            result_cids = self.choose('Choose child id(s):', [f'({COLORS[i % len(COLORS)]["name"]})' for i in range(max_id + 1)], offset=0)
+        # if status == Status.OK:
+        #     result_cids = self.choose('Choose child id(s):', [f'({COLORS[i % len(COLORS)]["name"]})' for i in range(max_id + 1)], offset=0)
 
         return status, result_labels, result_cids, result_notes
 
@@ -178,11 +178,12 @@ class Validator:
                 if not _df.empty:  # and if the tagged row is not None / Skip / Whatever I decide
                     continue
 
-                skeleton = read_json(spath)['data'] if spath else None
-                max_id = np.max([s['person_id'] for v in skeleton for s in v['skeleton']]) if spath and any([v['skeleton'] for v in skeleton]) else 0
+                # skeleton = read_pkl(spath)
+                # max_id = np.max([s['person_id'] for v in skeleton for s in v['skeleton']]) if spath and any([v['skeleton'] for v in skeleton]) else 0
+                max_id = 0 # TODO: FIX
                 split = name.split('_')
                 basename = '_'.join(split[:-3])
-                _, fps, _ = get_video_properties(vpath)
+                _, fps, _, _ = get_video_properties(vpath)
                 org_labels, start_frame, end_frame = split[-3:]
                 org_labels = org_labels.split(',')
                 start_frame, end_frame = int(start_frame), int(end_frame)
@@ -209,9 +210,9 @@ class GlobalCommandEvent(Exception):
 
 
 if __name__ == '__main__':
-    root = r'E:\QA\Ofri'
+    root = r'Z:\Users\TalBarami\JORDI_50_vids_benchmark\movement_type_qa'
     videos_path = path.join(root, 'skeleton_videos')
-    skeletons_path = path.join(root, 'skeletons')
+    skeletons_path = path.join(root, 'skeletons', 'raw')
     # labels = read_json('D:/skeletons/label.json')
     # _actions = {'Hand flapping', 'Tapping', 'Clapping', 'Body rocking', 'Tremor', 'Head movement'}
     # files = [(path.splitext(name)[0], path.join(videos_path, name), path.join(skeletons_path, f'{path.splitext(name)[0]}.json')) for name in os.listdir(videos_path) if
@@ -220,8 +221,7 @@ if __name__ == '__main__':
     #          and labels[path.splitext(name)[0]]['label'] in _actions]
     # bad = read_json('C:/Users/owner/PycharmProjects/RepetitiveMotionRecognition/resources/qa/bad_files.json')
     # files = [(path.splitext(name)[0], path.join(videos_path, name), None) for name in os.listdir(videos_path) if path.splitext(name)[0] in bad]
-
-    files = [(path.splitext(name)[0], path.join(videos_path, name), path.join(skeletons_path, f'{path.splitext(name)[0]}.json')) for name in os.listdir(videos_path) if
-             path.isfile(path.join(skeletons_path, f'{path.splitext(name)[0]}.json'))]
-    val = Validator(files, BODY_25_LAYOUT)
+    files = [(path.splitext(name)[0], path.join(videos_path, name), path.join(skeletons_path, f'{path.splitext(name)[0]}.pkl')) for name in os.listdir(videos_path) if
+             path.isfile(path.join(skeletons_path, f'{path.splitext(name)[0]}.pkl'))]
+    val = Validator(files, COCO_LAYOUT)
     val.run()
