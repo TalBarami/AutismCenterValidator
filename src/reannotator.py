@@ -200,8 +200,6 @@ class Reannotator:
                     self.globals[gce.method].func_ref(*gce.args)
             vids = list(self.df[self.df['status'] == Status.NONE.value]['video'].unique())
 
-            # TODO: Copy the code from below. Instead of groupby, use df.loc[df['video'] == v]
-
 
 class GlobalCommandEvent(Exception):
     def __init__(self, method, *args):
