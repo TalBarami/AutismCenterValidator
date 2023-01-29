@@ -7,17 +7,19 @@ from enum import Enum
 import cv2
 import pandas as pd
 import numpy as np
+import itertools as it
 import os
 
 from os import path as osp
 
-from skeleton_tools.skeleton_visualization.numpy_visualizer import MMPoseVisualizer
-from skeleton_tools.utils.constants import REAL_DATA_MOVEMENTS, COLORS
-from skeleton_tools.utils.evaluation_utils import collect_labels
+from skeleton_tools.skeleton_visualization.mmpose_visualizer import MMPoseVisualizer
+from skeleton_tools.utils.constants import REAL_DATA_MOVEMENTS, COLORS, NET_NAME
+from skeleton_tools.utils.evaluation_utils import collect_labels, get_intersection
 
 from skeleton_tools.utils.tools import get_video_properties, read_json, read_pkl
 
 from skeleton_tools.openpose_layouts.body import BODY_25_LAYOUT, COCO_LAYOUT
+from sklearn.metrics import confusion_matrix
 
 
 class Status(Enum):
@@ -38,16 +40,15 @@ class Global:
 
 
 class Reannotator:
-    def __init__(self, df, skeleton_layout, debug=False):
+    def __init__(self, df, skeleton_layout, debug=False, qa=False):
         Path('resources/').mkdir(parents=True, exist_ok=True)
-        self._df = df
         self.out_path = 'resources/qa.csv'
-        if osp.exists(self.out_path):
-            self.df = pd.read_csv(self.out_path)
-        else:
-            self.df = self._df.copy()
-            self.df['status'] = Status.NONE.value
-            self.df['notes'] = ''
+        self.qa = qa
+        self.df = df
+        self.status_col = 'status_qa2' if self.qa else 'status'
+        self.notes_col = 'notes_qa2' if self.qa else 'notes'
+        self.timestep_col = 'qa2_timestep' if self.qa else 'qa_timestep'
+
         self.executor = ThreadPoolExecutor()
         self.skeleton_layout = skeleton_layout
         self.sequence_length = 250
@@ -146,10 +147,19 @@ class Reannotator:
         cids = skeleton['child_ids'][s:t]
         i = 0
         frames = []
+        n, m = self.df[self.df[self.status_col] != Status.NONE.value].shape[0], self.df.shape[0]
         while i < length:
             ret, frame = cap.read()
-            skel_frame = sv.draw_skeletons(np.zeros_like(frame), kp[:, i], kps[:, i], child_id=cids[i])
+            if not ret:
+                break
+            skel_frame = sv._draw_skeletons(np.zeros_like(frame), kp[:, i], kps[:, i], child_id=cids[i])
             frame = np.concatenate((frame, skel_frame), axis=1)
+            cv2.putText(frame, f'{n}/{m}',
+                        (int(width * 0.05), int(height * 0.05)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1,
+                        (100, 30, 255),
+                        2)
             if i < 10:
                 cv2.putText(frame, 'Reset',
                             (int(width * 0.5), int(height * 0.5)),
@@ -169,14 +179,17 @@ class Reannotator:
         return frames
 
     def run(self):
-        vids = list(self.df[self.df['status'] == Status.NONE.value]['video'].unique())
+        def get_vids():
+            return list(self.df[(self.df['status'] != Status.NONE.value) & (self.df['status_qa2'] == Status.NONE.value)]['video'].unique()) if self.qa \
+                else list(self.df[self.df['status'] == Status.NONE.value]['video'].unique())
+        vids = get_vids()
         while any(vids):
             v = vids[0]
             g = self.df[self.df['video'] == v]
             video_path = g.iloc[0]['video_path']
             skeleton = read_pkl(g.iloc[0]['skeleton_path'])
             while not g.empty:
-                g = self.df[(self.df['video'] == v) & (self.df['status'] == Status.NONE.value)]
+                g = self.df[(self.df['video'] == v) & (self.df[self.status_col] == Status.NONE.value)]
                 row, idx = g.iloc[0], g.index[0]
                 try:
                     s, t = row['start_frame'], row['end_frame']
@@ -192,13 +205,13 @@ class Reannotator:
                     task = self.executor.submit(lambda: self.validate())
                     self.play(v, frames, done=task.done)
                     status, notes = task.result()
-                    self.df.loc[idx, ['status', 'notes']] = [status, notes]
+                    self.df.loc[idx, [self.status_col, self.notes_col, self.timestep_col]] = [status, notes, datetime.now()]
                     self.df.to_csv(self.out_path, index=False)
                     self.stack.append(idx)
                     g = g.drop(idx)
                 except GlobalCommandEvent as gce:
                     self.globals[gce.method].func_ref(*gce.args)
-            vids = list(self.df[self.df['status'] == Status.NONE.value]['video'].unique())
+            vids = get_vids()
 
 
 class GlobalCommandEvent(Exception):
@@ -210,16 +223,95 @@ class GlobalCommandEvent(Exception):
         return f'{self.method} {self.args}'
 
 
+def conclusions():
+    df = pd.read_csv(r'resources/qa.csv')
+    print(f'Number of samples: {len(df)}')
+    df = df[~df['movement'].isna() & (df['status'] != "NONE")]
+    print(f'Number of qa samples: {len(df)}')
+    df['movement_bin'] = df['movement'].apply(lambda m: 0 if 'NoAction' in m else 1)
+    df['post_qa'] = df['status'].apply(lambda s: 1 if 'STEREOTYPICAL' in s else 0)
+
+    # df = df[df['source'] == 'JORDI']
+    # df = df[df['movement_bin'] == 1]
+
+    ann = pd.read_csv(r'Z:\Users\TalBarami\lancet_submission_data\annotations\combined.csv')
+    ann_intervals = {v: intervals for v, intervals in ann.groupby('video')[['start_frame', 'end_frame']]}
+    def match_row(row):
+        v = row['video']
+        intervals = ann_intervals[v].values
+        s, t = row['start_frame'], row['end_frame']
+        intersections = any([x for x in ((get_intersection((s, t), interval), interval) for interval in intervals) if x[0] is not None])
+        return int(intersections)
+
+    df['pre_qa'] = df.apply(match_row, axis=1)
+    df.to_csv('resources/qa_processed.csv', index=False)
+    # df = df[df['source'] == 'JORDI']
+    def calc_results(col):
+        tp, fp, tn, fn = df[(df['movement_bin'] == 1) & (df[col] == 1)].shape[0], \
+                         df[(df['movement_bin'] == 1) & (df[col] == 0)].shape[0], \
+                         df[(df['movement_bin'] == 0) & (df[col] == 0)].shape[0], \
+                         df[(df['movement_bin'] == 0) & (df[col] == 1)].shape[0]
+        p = tp / (tp + fp)
+        r = tp / (tp + fn)
+        f1 = 2 * p * r / (p + r)
+        cm = np.array([[tp, fp], [fn, tn]])
+        print(f'Confusion Matrix for {col}: \n{cm}')
+        print(f'Results for {col}: Precision - {p}, Recall - {r}, F1 - {f1}')
+    for col in ['pre_qa', 'post_qa']:
+        calc_results(col)
+    print(df.shape)
+
+def load_dataframe(qa_file):
+    root = r'Z:\Users\TalBarami\jordi_cross_validation'
+    models = ['cv0.pth', 'cv1.pth', 'cv2.pth', 'cv3.pth', 'cv4.pth']
+    dfs = [collect_labels(root, osp.join('jordi', m)) for m in models]
+    df = pd.concat(dfs, ignore_index=True)
+    control = set(pd.read_excel(r'Z:\Users\TalBarami\jordi_cross_validation\control_list.xlsx')['Control children'].tolist())
+    df = df[~df['child_id'].isin(control)]
+    df['skeleton_path'] = df['video'].apply(lambda v: osp.join(root, v, 'jordi', f'{v}.pkl'))
+    df['movement'] = df['movement'].fillna('Stereotypical')
+    df = df.groupby(['video', 'start_frame', 'end_frame']).agg({'movement': lambda l: ','.join(set(it.chain(*[[m.strip() for m in x.split(',')] for x in l]))), **{c: lambda x: x.iloc[0] for c in df.columns if c != 'movement'}}).reset_index(drop=True)
+    df['status'] = Status.NONE.value
+    df['notes'] = ''
+    df['qa_timestep'] = None
+    if osp.exists(qa_file):
+        qa = pd.read_csv(qa_file)
+        for i, row in qa.iterrows():
+            df_row = df.loc[(df['video'] == row['video']) & (df['start_frame'] == row['start_frame']) & (df['end_frame'] == row['end_frame'])]
+            if len(df_row) == 1:
+                df.loc[df_row.index, ['status', 'notes', 'qa_timestep']] = row['status'], row['notes'], row['qa_timestep']
+            elif len(df_row) > 1:
+                movements = ','.join(df_row['movement'].unique())
+                validated = df_row[df_row['status'] != Status.NONE.value]
+                df_row = df_row.iloc[0]
+                df_row['movement'] = movements
+                if not validated.empty:
+                    val = validated.iloc[0]
+                    df_row['status'] = val['status']
+                    df_row['notes'] = val['notes']
+                df.loc[df_row.name] = df_row
+            else:
+                print(f'Error: QA row {i} does not match any row in the original dataframe.')
+    return df
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--debug', action='store_true')
+    parser.add_argument('-c', '--conclude', action='store_true')
+    parser.add_argument('-r', '--reload', action='store_true')
+    parser.add_argument('--qa', action='store_true')
     args = parser.parse_args()
-
-    root = r'Z:\Users\TalBarami\jordi_cross_validation'
-    models = ['cv0.pth', 'cv1.pth']
-    dfs = [collect_labels(root, osp.join('jordi', m)) for m in models]
-    df = pd.concat(dfs, ignore_index=True)
-    df['skeleton_path'] = df['video'].apply(lambda v: osp.join(root, v, 'jordi', f'{v}.pkl'))
-
-    ann = Reannotator(df, COCO_LAYOUT, debug=args.debug)
-    ann.run()
+    if args.conclude:
+        conclusions()
+    else:
+        qa_file = 'resources/qa.csv'
+        if args.reload:
+            df = load_dataframe(qa_file)
+        else:
+            df = pd.read_csv(qa_file)
+        if 'status_qa2' not in df.columns:
+            df['status_qa2'] = Status.NONE.value
+            df['notes_qa2'] = ''
+            df['qa2_timestep'] = None
+        ann = Reannotator(df, COCO_LAYOUT, debug=args.debug, qa=args.qa)
+        ann.run()

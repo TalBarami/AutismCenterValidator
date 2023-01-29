@@ -41,7 +41,7 @@ class Validator:
     def __init__(self, files, skeleton_layout):
         Path('resources/').mkdir(parents=True, exist_ok=True)
         self.files = files
-        self.out_path = 'resources/qa.csv'
+        self.out_path = 'resources/qa_backup.csv'
         self.df = pd.read_csv(self.out_path) if path.isfile(self.out_path) else pd.DataFrame(columns=['video_name', 'segment_name', 'start_time', 'end_time', 'start_frame', 'end_frame', 'status', 'actions', 'child_ids', 'time', 'notes'])
         self.executor = ThreadPoolExecutor()
         self.skeleton_layout = skeleton_layout
