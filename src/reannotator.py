@@ -188,6 +188,7 @@ class Reannotator:
             g = self.df[self.df['video'] == v]
             video_path = g.iloc[0]['video_path']
             skeleton = read_pkl(g.iloc[0]['skeleton_path'])
+            resolution, fps, frame_count, length = get_video_properties(video_path)
             while not g.empty:
                 g = self.df[(self.df['video'] == v) & (self.df[self.status_col] == Status.NONE.value)]
                 row, idx = g.iloc[0], g.index[0]
@@ -200,12 +201,22 @@ class Reannotator:
                             s = np.random.randint(0, total_length - l)
                             t = s + l
                     s, t = int(s), int(t)
-                    print(f'Validating: {v} ({s}-{t})' + f' - {row["movement"]}' if self.debug else '')
+                    print(f'Validating: {v} ({s}-{t})' + f' - ({row["annotator"]}, {row["movement"]}, [{s}, {t}], [{row["start_frame"]}, {row["end_frame"]}])' if self.debug else '')
                     frames = self.gen_video(video_path, skeleton, s, t)
                     task = self.executor.submit(lambda: self.validate())
                     self.play(v, frames, done=task.done)
                     status, notes = task.result()
-                    self.df.loc[idx, [self.status_col, self.notes_col, self.timestep_col]] = [status, notes, datetime.now()]
+                    if status == Status.STEREOTYPICAL and row['movement'] == 'NoAction':
+                        r1, r2, r3 = row.copy(), row.copy(), row.copy()
+                        r1[['movement', 'annotator', 'source', 'start_frame', 'end_frame', 'start_time', 'end_time', 'status']] = 'NoAction', 'Human', 'JORDI', row['start_frame'], s, row['start_time'], s / fps, Status.NO_ACTION
+                        r2[['movement', 'annotator', 'source', 'start_frame', 'end_frame', 'start_time', 'end_time', 'status']] = 'Stereotypical', 'Human', 'JORDI', s, t, s / fps, t / fps, Status.STEREOTYPICAL
+                        r3[['movement', 'annotator', 'source', 'start_frame', 'end_frame', 'start_time', 'end_time', 'status']] = 'NoAction', 'Human', 'JORDI', t, row['end_frame'], t / fps, row['end_time'], Status.NO_ACTION
+                        self.df.loc[df.shape[-1]] = r1
+                        self.df.loc[df.shape[-1]] = r2
+                        self.df.loc[df.shape[-1]] = r3
+                        self.df.loc[idx, [self.status_col, self.notes_col, self.timestep_col]] = [Status.SKIP, notes, datetime.now()]
+                    else:
+                        self.df.loc[idx, [self.status_col, self.notes_col, self.timestep_col]] = [status, notes, datetime.now()]
                     self.df.to_csv(self.out_path, index=False)
                     self.stack.append(idx)
                     g = g.drop(idx)
