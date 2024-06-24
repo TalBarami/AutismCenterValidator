@@ -42,8 +42,8 @@ class Global:
 class Reannotator:
     def __init__(self, df, skeleton_layout, debug=False, qa=False):
         Path('resources/').mkdir(parents=True, exist_ok=True)
-        self.out_path = 'resources/qa.csv'
-        self.cfg_file = 'resources/cfg.json'
+        self.out_path = r'Z:\Users\TalBarami\videos_qa\qa.csv'
+        self.cfg_file = 'resources/config.json'
         self.qa = qa
         self.df = df
         self.status_col = 'status_qa2' if self.qa else 'status'
@@ -250,16 +250,17 @@ class GlobalCommandEvent(Exception):
 
 
 def conclusions():
-    df = pd.read_csv(r'resources/qa.csv')
+    df = pd.read_csv(r'Z:\Users\TalBarami\videos_qa\qa.csv')
+    df = df[(df['start_time'] <= df['end_time']) & (df['start_frame'] <= df['end_frame'])]
     print(f'Total number of samples: {len(df)}')
-    df = df[(df['status'] != "NONE") & (df['status_qa2'] != "NONE")]
+    # df = df[(df['status'] != "NONE") & (df['status_qa2'] != "NONE")]
     print(f'Number of qa samples: {len(df)}')
-    df['status'] = df['status'].apply(lambda s: 'Stereotypical' if s == 'Status.STEREOTYPICAL' else 'NoAction')
-    df['status_qa2'] = df['status_qa2'].apply(lambda s: 'Stereotypical' if s == 'Status.STEREOTYPICAL' else 'NoAction')
+    df['status'] = df['status'].apply(lambda s: 'Stereotypical' if s == 'Status.STEREOTYPICAL' else 'NoAction' if s == 'Status.NO_ACTION' else 'NONE')
+    df['status_qa2'] = df['status_qa2'].apply(lambda s: 'Stereotypical' if s == 'Status.STEREOTYPICAL' else 'NoAction' if s == 'Status.NO_ACTION' else 'NONE')
     df = df[df['movement'] != 'NoAction']
     df['_annotator'] = df['annotator'].apply(lambda a: 'Human' if a != 'JORDI' else a)
-    props = {v: get_video_properties(v_path) for v, v_path in df[['video', 'video_path']].drop_duplicates().values}
-    props = {v: {'width': p[0][0], 'height': p[0][1], 'fps': p[1], 'frame_count': p[2], 'length_seconds': p[3]} for v, p in props.items()}
+    db = pd.read_csv(DB_PATH)
+    props = {v: db[db['basename'] == v][['width', 'height', 'fps', 'frame_count', 'length_seconds']].iloc[0].to_dict() for v, v_path in df[['video', 'video_path']].drop_duplicates().values}
     # df = df[df['child_id'] != 645433144]
     res = pd.DataFrame(columns=['video', 'human_start', 'human_end', 'jordi_start', 'jordi_end',
                                'human_annotation', 'jordi_annotation', 'qa_hadas', 'qa_ofri',
@@ -308,6 +309,7 @@ def conclusions():
         res.loc[res.shape[0]] = ([row['video'], h_start, h_end, m_start, m_end, h_ann, m_ann, row['status'], row['status_qa2'], row['model'], ann,
                                   row['assessment'], row['child_id'], row['video_path'], row['skeleton_path'],
                                   props[row['video']]['width'], props[row['video']]['height'], props[row['video']]['fps'], props[row['video']]['frame_count'], props[row['video']]['length_seconds']])
+    res['qa_hadas'] = res.apply(lambda row: 'Stereotypical' if (row['qa_hadas'] == 'NoAction' and row['human_annotation'] != 'NoAction' and row['jordi_annotation'] != 'NoAction') else row['qa_hadas'], axis=1)
     s, no_acts = 0, []
     for v, df in res.groupby('video'):
         df['ss'] = df[['human_start', 'jordi_start']].min(axis=1)
@@ -316,9 +318,9 @@ def conclusions():
         s = 0
         for i, row in df.iterrows():
             ss, tt = row['ss'], row['tt']
-            no_acts.append([row['video'], s, ss, s, ss, 'NoAction', 'NoAction', 'NoAction', 'NoAction', '', 'Human', row['assessment'], row['child_id'], row['video_path'], row['skeleton_path'], row['width'], row['height'], row['fps'], row['frame_count'], row['length_seconds']])
+            no_acts.append([row['video'], s, ss, s, ss, 'NoAction', 'NoAction', 'NONE', 'NONE', '', 'Human', row['assessment'], row['child_id'], row['video_path'], row['skeleton_path'], row['width'], row['height'], row['fps'], row['frame_count'], row['length_seconds']])
             s = tt
-        no_acts.append([row['video'], s, row['length_seconds'], s, row['length_seconds'], 'NoAction', 'NoAction', 'NoAction', 'NoAction', '', 'Human', row['assessment'], row['child_id'], row['video_path'], row['skeleton_path'], row['width'], row['height'], row['fps'], row['frame_count'], row['length_seconds']])
+        no_acts.append([row['video'], s, row['length_seconds'], s, row['length_seconds'], 'NoAction', 'NoAction', 'NONE', 'NONE', '', 'Human', row['assessment'], row['child_id'], row['video_path'], row['skeleton_path'], row['width'], row['height'], row['fps'], row['frame_count'], row['length_seconds']])
     no_acts = pd.DataFrame(no_acts, columns=res.columns)
     res = pd.concat([res, no_acts])
     res['_human_annotation'] = res['human_annotation']
@@ -330,7 +332,7 @@ def conclusions():
     print(pd.crosstab(res['jordi_annotation'], res['qa_ofri']))
     # res['movement_bin'] = res['movement'].apply(lambda m: 0 if 'NoAction' in m else 1)
     # res['post_qa'] = res['status'].apply(lambda s: 1 if 'STEREOTYPICAL' in s else 0)
-    res.to_csv('resources/qa_processed.csv', index=False)
+    res.to_csv(r'Z:\Users\TalBarami\videos_qa\qa_processed.csv', index=False)
 
     # df = df[df['source'] == 'JORDI']
     # df = df[df['movement_bin'] == 1]
@@ -390,7 +392,7 @@ def load_dataframe(qa_files):
     df['end_frame'] = df['end_frame'].round()
     df = df.drop_duplicates(subset=['video', 'start_frame']).sort_values(by=['model', 'video', 'start_frame']).reset_index(drop=True)
     return df
-# Ignore child 645433144
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--debug', action='store_true')
@@ -401,10 +403,10 @@ if __name__ == '__main__':
     if args.conclude:
         conclusions()
     else:
-        qa_files = [r'Z:\Users\TalBarami\qa.csv', r'Z:\Users\TalBarami\qa_old.csv']
+        qa_files = [r'Z:\Users\TalBarami\videos_qa\qa.csv', r'Z:\Users\TalBarami\videos_qa\qa_old.csv']
         if args.reload:
             df = load_dataframe(qa_files)
         else:
-            df = pd.read_csv('resources/qa.csv')
+            df = pd.read_csv(r'Z:\Users\TalBarami\videos_qa\qa.csv')
         ann = Reannotator(df, COCO_LAYOUT, debug=args.debug, qa=args.qa)
         ann.run()
