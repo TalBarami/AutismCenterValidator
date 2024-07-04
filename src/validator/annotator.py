@@ -28,11 +28,11 @@ class GlobalCommandEvent(Exception):
 
 
 class Annotator:
-    def __init__(self, root):
+    def __init__(self, root, annotations_filename='annotations.csv'):
         self.root = root
         self.status_types = ['OK', 'No child', 'Overlapping', 'Corrupted video', 'Skip']
 
-        self.data_handler = DataHandler(osp.join(root, 'annotations.csv'), osp.join(root, 'data2'))
+        self.data_handler = DataHandler(osp.join(root, annotations_filename), osp.join(root, 'data2'))
         self.video_player = YOLOPlayer(osp.join(RESOURCES_ROOT, 'config.json'))
 
         self.executor = ThreadPoolExecutor()
@@ -99,5 +99,5 @@ class Annotator:
 
 
 if __name__ == '__main__':
-    ann = Annotator(r'Z:\Users\TalBarami\ChildDetect')
+    ann = Annotator(r'Z:\Users\TalBarami\ChildDetect', 'noa.csv')
     ann.run()
