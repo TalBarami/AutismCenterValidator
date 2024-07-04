@@ -104,12 +104,13 @@ class YOLOPlayer(VideoPlayer):
             if not ret:
                 break
             annotator = Annotator(frame)
-            boxes = tracking['data'][i]['boxes']
+            boxes = [b for b in tracking['data'][i]['boxes'] if b.cls == 0]
             for box in boxes:
                 b = box.xyxy[0]
                 c = box.cls
                 pid = int(box.id[0]) if box.id is not None else -1
-                color = COLORS[pid % len(COLORS)]['value'] if c == 0 else (128, 128, 128)
+                color = COLORS[pid % len(COLORS)]['value']
+                color = (color[2], color[1], color[0])
                 annotator.box_label(b, f'{tracking["names"][int(c)]} {pid}', color=color)
             frame = annotator.result()
             frames.append(frame)
