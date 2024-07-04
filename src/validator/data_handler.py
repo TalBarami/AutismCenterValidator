@@ -11,8 +11,8 @@ class DataHandler:
     def __init__(self, annotations_file, data_dir):
         self.annotations_file = annotations_file
         self.data_dir = data_dir
-        self.collect_annotations()
-        self.df = pd.read_csv(self.annotations_file)
+        self.df = self.collect_annotations()
+        self.save()
         self.stack = []
 
     def collect_annotations(self):
@@ -33,10 +33,10 @@ class DataHandler:
             common_indices = merged.index
             df = df.drop(common_indices)
             df = pd.concat([_df, df]).reset_index(drop=True)
-        df = df.sort_values(by=['video', 'start_frame'])
-        df.to_csv(self.annotations_file, index=False)
+        return df
 
     def save(self):
+        self.df = self.df.sort_values(by=['video', 'start_frame'])
         self.df.to_csv(self.annotations_file, index=False)
 
     def revert(self):
