@@ -62,7 +62,7 @@ class VideoPlayer:
 
     def play(self, video_name, frames, done=None, counter_text=None):
         fps = 30
-        org_resolution = frames[0].shape[:2]
+        org_resolution = frames.shape[1:3]
         i = 0
         delay = int((1000 / fps / self.speed))
         while True:
@@ -116,7 +116,7 @@ class YOLOPlayer(VideoPlayer):
             frames.append(frame)
             i += 1
         cap.release()
-        return frames
+        return np.array(frames)
 
 
 

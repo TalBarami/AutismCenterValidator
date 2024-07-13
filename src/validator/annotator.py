@@ -32,7 +32,7 @@ class Annotator:
         self.root = root
         self.status_types = ['OK', 'No child', 'Overlapping', 'Corrupted video', 'Skip']
 
-        self.data_handler = DataHandler(osp.join(root, annotations_filename), osp.join(root, 'data2'))
+        self.data_handler = DataHandler(osp.join(root, annotations_filename), osp.join(root, 'annotations'), osp.join(root, 'data'))
         self.video_player = YOLOPlayer(osp.join(RESOURCES_ROOT, 'config.json'))
 
         self.executor = ThreadPoolExecutor()
@@ -41,6 +41,7 @@ class Annotator:
                                             Global('speed', 1, self.video_player.set_speed),
                                             Global('resolution', 2, self.video_player.set_resolution),
                                             Global('reset', 0, self.video_player.reset)]}
+        self.queue_size = 10
 
     def exit(self):
         self.data_handler.save()
@@ -74,30 +75,70 @@ class Annotator:
         result_notes = input('Save notes: ') if status == 'Skip' else None
         return status, result_notes, child_ids
 
+    def add_to_queue(self, row):
+        tracking = read_pkl(row['data_path'])
+        k = int(max([x['boxes'].id.max() for x in tracking['data'] if x['boxes'].id is not None])) + 1
+        processed = self.video_player.gen_video(row['video_path'], tracking)
+        return row.name, processed, k
+
     def run(self):
         df = self.data_handler.get_rows()
         n = df.shape[0]
         m = self.data_handler.df.shape[0]
+
+        tasks = [self.executor.submit(self.add_to_queue, df.iloc[i]) for i in range(min(self.queue_size, n))]
+        # wait for tasks to finish
+
         while not df.empty:
             row = df.iloc[0]
-            v, s, t = row['video'], row['start_frame'], row['end_frame']
+            v, s, t = row['basename'], row['start_frame'], row['end_frame']
             idx = row.name
             try:
-                logger.info(f'Processing {row["video"]} {s}-{t}')
-                tracking = read_pkl(row['data_path'])
-                # k = int(skeleton['person_ids'].max() + 1)
-                k = max([int(x['boxes'].id.max()) for x in tracking['data'] if x['boxes'].id is not None])
-                processed = self.video_player.gen_video(row['video_path'], tracking)
+                logger.info(f'Processing {row["basename"]} {s}-{t}')
+                _idx, frames, k = tasks[0].result()
+                assert _idx == idx
                 task = self.executor.submit(lambda: self.validate(opts=self.status_types, max_people=k))
-                self.video_player.play(f'{v}: ({s}-{t})', processed, done=task.done, counter_text=f'{m-n}/{m}')
+                self.video_player.play(f'{v}: ({s}-{t})', frames, done=task.done, counter_text=f'{m-n}/{m}')
                 status, notes, child_ids = task.result()
                 self.data_handler.add(idx, status, notes, child_ids)
                 df = df.drop(idx)
+                tasks.pop(0)
                 n = df.shape[0]
+                tasks.append(self.executor.submit(self.add_to_queue, df.iloc[min(self.queue_size-1, n)]))
             except GlobalCommandEvent as gce:
                 self.globals[gce.method].func_ref(*gce.args)
 
 
+        # while not df.empty:
+        #     row = df.iloc[0]
+        #     v, s, t = row['video'], row['start_frame'], row['end_frame']
+        #     idx = row.name
+        #     try:
+        #         logger.info(f'Processing {row["video"]} {s}-{t}')
+        #         tracking = read_pkl(row['data_path'])
+        #         # k = int(skeleton['person_ids'].max() + 1)
+        #         k = int(max([x['boxes'].id.max() for x in tracking['data'] if x['boxes'].id is not None])) + 1
+        #         processed = self.video_player.gen_video(row['video_path'], tracking)
+        #         task = self.executor.submit(lambda: self.validate(opts=self.status_types, max_people=k))
+        #         self.video_player.play(f'{v}: ({s}-{t})', processed, done=task.done, counter_text=f'{m-n}/{m}')
+        #         status, notes, child_ids = task.result()
+        #         self.data_handler.add(idx, status, notes, child_ids)
+        #         df = df.drop(idx)
+        #         n = df.shape[0]
+        #     except GlobalCommandEvent as gce:
+        #         self.globals[gce.method].func_ref(*gce.args)
+
+
 if __name__ == '__main__':
+    print('Starting annotator...')
     ann = Annotator(r'Z:\Users\TalBarami\ChildDetect', 'noa.csv')
+    print('Annotator started. Short guide:')
+    print('1. Choose status: OK, No child, Overlapping, Corrupted video, Skip')
+    print('2. If you typed \'Skip\', you will be asked to save notes.')
+    print('3. If you typed \'OK\', you will be asked to choose child ID(s). You can choose multiple IDs separated by space.')
+    print('4. To exit annotator, type \'-exit\'.')
+    print('5. To revert last action, type \'-revert\'.')
+    print('6. To change video speed, type \'-speed <speed>\'.')
+    print('7. To change video resolution, type \'-resolution <width> <height>\'.')
+    print('8. To restart the video, type \'-reset\'.')
     ann.run()
