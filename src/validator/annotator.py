@@ -77,7 +77,8 @@ class Annotator:
 
     def add_to_queue(self, row):
         tracking = read_pkl(row['data_path'])
-        k = int(max([x['boxes'].id.max() for x in tracking['data'] if x['boxes'].id is not None])) + 1
+        a = [x['boxes'].id.max() for x in tracking['data'] if x['boxes'].id is not None]
+        k = int(max(a) if len(a) > 0 else 0) + 1
         processed = self.video_player.gen_video(row['video_path'], tracking)
         return row.name, processed, k
 
