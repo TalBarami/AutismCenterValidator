@@ -1,3 +1,4 @@
+import argparse
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from pathlib import Path
@@ -28,11 +29,13 @@ class GlobalCommandEvent(Exception):
 
 
 class Annotator:
-    def __init__(self, root, annotations_filename='annotations.csv'):
+    def __init__(self, root, annotations_filename, annotator_id):
         self.root = root
-        self.status_types = ['OK', 'No child', 'Overlapping', 'Corrupted video', 'Skip']
+        self.annotations_filename = annotations_filename
+        self.annotator_id = annotator_id
 
-        self.data_handler = DataHandler(osp.join(root, annotations_filename), osp.join(root, 'annotations'), osp.join(root, 'data'))
+        self.status_types = ['OK', 'No child', 'Overlapping', 'Corrupted video', 'Skip']
+        self.data_handler = DataHandler(osp.join(root, self.annotations_filename), osp.join(root, 'annotations'), osp.join(root, 'data'), self.annotator_id)
         self.video_player = YOLOPlayer(osp.join(RESOURCES_ROOT, 'config.json'))
 
         self.executor = ThreadPoolExecutor()
@@ -110,29 +113,16 @@ class Annotator:
                 self.globals[gce.method].func_ref(*gce.args)
 
 
-        # while not df.empty:
-        #     row = df.iloc[0]
-        #     v, s, t = row['video'], row['start_frame'], row['end_frame']
-        #     idx = row.name
-        #     try:
-        #         logger.info(f'Processing {row["video"]} {s}-{t}')
-        #         tracking = read_pkl(row['data_path'])
-        #         # k = int(skeleton['person_ids'].max() + 1)
-        #         k = int(max([x['boxes'].id.max() for x in tracking['data'] if x['boxes'].id is not None])) + 1
-        #         processed = self.video_player.gen_video(row['video_path'], tracking)
-        #         task = self.executor.submit(lambda: self.validate(opts=self.status_types, max_people=k))
-        #         self.video_player.play(f'{v}: ({s}-{t})', processed, done=task.done, counter_text=f'{m-n}/{m}')
-        #         status, notes, child_ids = task.result()
-        #         self.data_handler.add(idx, status, notes, child_ids)
-        #         df = df.drop(idx)
-        #         n = df.shape[0]
-        #     except GlobalCommandEvent as gce:
-        #         self.globals[gce.method].func_ref(*gce.args)
-
-
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Annotator')
+    parser.add_argument('--root', type=str, help='Root directory')
+    parser.add_argument('--annotator', type=int, help='Annotator ID', choices=[0, 1])
+    args = parser.parse_args()
+    annotators = {0: 'noa', 1: 'shaked'}
+    root = args.root
+    annotator = args.annotator
     print('Starting annotator...')
-    ann = Annotator(r'Z:\Users\TalBarami\ChildDetect', 'noa.csv')
+    program = Annotator(root, f'{annotators[annotator]}.csv', annotator)
     print('Annotator started. Short guide:')
     print('1. Choose status: OK, No child, Overlapping, Corrupted video, Skip')
     print('2. If you typed \'Skip\', you will be asked to save notes.')
@@ -142,4 +132,4 @@ if __name__ == '__main__':
     print('6. To change video speed, type \'-speed <speed>\'.')
     print('7. To change video resolution, type \'-resolution <width> <height>\'.')
     print('8. To restart the video, type \'-reset\'.')
-    ann.run()
+    program.run()
