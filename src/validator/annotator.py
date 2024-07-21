@@ -79,6 +79,8 @@ class Annotator:
         return status, result_notes, child_ids
 
     def add_to_queue(self, row):
+        if not osp.exists(row['data_path']):
+            return row.name, None, None
         tracking = read_pkl(row['data_path'])
         a = [x['boxes'].id.max() for x in tracking['data'] if x['boxes'].id is not None]
         k = int(max(a) if len(a) > 0 else 0) + 1
@@ -100,6 +102,11 @@ class Annotator:
             try:
                 logger.info(f'Processing {row["basename"]} {s}-{t}')
                 _idx, frames, k = tasks[0].result()
+                if not osp.exists(row['video_path']) or not osp.exists(row['data_path']):
+                    df = df.drop(idx)
+                    tasks.pop(0)
+                    tasks.append(self.executor.submit(self.add_to_queue, df.iloc[min(self.queue_size - 1, n)]))
+                    continue
                 assert _idx == idx
                 task = self.executor.submit(lambda: self.validate(opts=self.status_types, max_people=k))
                 self.video_player.play(f'{v}: ({s}-{t})', frames, done=task.done, counter_text=f'{m-n}/{m}')
