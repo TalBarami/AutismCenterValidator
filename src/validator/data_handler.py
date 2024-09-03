@@ -35,13 +35,15 @@ class DataHandler:
         _app['child_ids'] = np.nan
         _app['timestep'] = np.nan
         _app['segment_name'] = _app.apply(lambda row: f"{row['basename']}_{row['start_frame']}_{row['end_frame']}", axis=1)
-        _app['video_path'] = _app['segment_name'].apply(lambda s: osp.join(self.data_dir, f'{s}.mp4'))
-        _app['data_path'] = _app['segment_name'].apply(lambda s: osp.join(self.data_dir, f'{s}.pkl'))
+        # _app['video_path'] = _app['segment_name'].apply(lambda s: osp.join(self.data_dir, f'{s}.mp4'))
+        # _app['data_path'] = _app['segment_name'].apply(lambda s: osp.join(self.data_dir, f'{s}.pkl'))
         merged = _app.merge(_df, on=['basename', 'start_frame', 'end_frame'], how='inner', suffixes=('', '_duplicate'))
         common_indices = merged.index
         df = _app.drop(common_indices)
         df = pd.concat([_df, df])
         df = df.sort_values(by=['start_frame', 'basename']).reset_index(drop=True)
+        df['video_path'] = df['segment_name'].apply(lambda s: osp.join(self.data_dir, f'{s}.mp4'))
+        df['data_path'] = df['segment_name'].apply(lambda s: osp.join(self.data_dir, f'{s}.pkl'))
         return df
 
 
