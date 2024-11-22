@@ -9,14 +9,17 @@ from skeleton_tools.utils.tools import write_json
 
 class DataHandler:
     def __init__(self, annotations_file, annotations_dir, data_dir, annotator_id):
+        self.n_annotators = 2
         self.annotations_file = annotations_file
         self.annotations_dir = annotations_dir
         self.data_dir = data_dir
         self.annotator_id = annotator_id
         self.df = self.collect_annotations()
-        vs = self.df['start_frame'].unique()
-        self.group = vs[self.annotator_id::2]
-        self.idx = self.df[self.df['start_frame'].isin(self.group)].index
+        # vs = self.df['start_frame'].unique()
+        # self.group = vs[self.annotator_id::2]
+        # self.idx = self.df[self.df['start_frame'].isin(self.group)].index
+        self.to_annotate = self.df[self.df['status'].isna()].index
+        self.idx = self.to_annotate[:len(self.to_annotate)//2] if self.annotator_id == 0 else self.to_annotate[len(self.to_annotate)//2:]
         self.save()
         self.stack = []
 
