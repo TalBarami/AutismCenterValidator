@@ -21,7 +21,6 @@ class VideoPlayer:
         self.cfg_path = cfg_path
         self.cfg = read_json(cfg_path)
         self.resolution_method = Resolution.AUTO
-        self.cmap = sns.color_palette('bright', 25)
 
         self.speed = self.cfg['speed']
         self.resolution = self.cfg['resolution']
@@ -84,6 +83,20 @@ class VideoPlayer:
                     fontsize,
                     color,
                     thickness)
+
+    def gen_video(self, video_path):
+        cap = cv2.VideoCapture(video_path)
+        frames = []
+        i = 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frames.append(frame)
+            i += 1
+        cap.release()
+        return np.array(frames)
+
 
 
 # class SkeletonPlayer(VideoPlayer):

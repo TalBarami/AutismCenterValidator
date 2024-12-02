@@ -8,11 +8,7 @@ import pandas as pd
 
 
 class DataHandler(ABC):
-    def __init__(self, annotations_file, annotations_dir, data_dir, annotator_id):
-        self.n_annotators = 2
-        self.annotations_file = annotations_file
-        self.annotations_dir = annotations_dir
-        self.data_dir = data_dir
+    def __init__(self, annotator_id):
         self.annotator_id = annotator_id
         self.df = self.collect_annotations()
         # vs = self.df['start_frame'].unique()
