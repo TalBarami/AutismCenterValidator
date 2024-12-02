@@ -1,16 +1,9 @@
-import argparse
+from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
-from pathlib import Path
 from os import path as osp
 
-import pandas as pd
-from skeleton_tools.utils.constants import COLORS
-from skeleton_tools.utils.tools import read_json, write_json, read_pkl
-
-from validator.constants import RESOURCES_ROOT, logger
-from validator.data_handler import DataHandler
-from validator.video_player import VideoPlayer, YOLOPlayer
+from validator.constants import logger
 
 
 class Global:
@@ -34,9 +27,9 @@ class Annotator:
         self.annotations_filename = annotations_filename
         self.annotator_id = annotator_id
 
-        self.status_types = ['OK', 'No child', 'Overlapping', 'Corrupted video', 'Skip']
-        self.data_handler = DataHandler(osp.join(root, self.annotations_filename), osp.join(root, 'annotations'), osp.join(root, 'data'), self.annotator_id)
-        self.video_player = YOLOPlayer(osp.join(RESOURCES_ROOT, 'config.json'))
+        self.status_types = self.init_status_types()
+        self.data_handler = self.init_data_handler()
+        self.video_player = self.init_video_player()
 
         self.executor = ThreadPoolExecutor()
         self.globals = {g.name: g for g in [Global('exit', 0, self.exit),
@@ -45,6 +38,19 @@ class Annotator:
                                             Global('resolution', 2, self.video_player.set_resolution),
                                             Global('reset', 0, self.video_player.reset)]}
         self.queue_size = 3
+
+    @abstractmethod
+    def init_data_handler(self):
+        pass
+
+    @abstractmethod
+    def init_status_types(self):
+        pass
+
+    @abstractmethod
+    def init_video_player(self):
+        pass
+
 
     def exit(self):
         self.data_handler.save()
@@ -71,21 +77,13 @@ class Annotator:
                 return [i for i in result]
             print('Error: Wrong selection.')
 
-    def validate(self, opts, max_people):
-        ans = self.choose('Choose status:', opts)
-        status = opts[ans[0]]
-        child_ids = self.choose('Choose child ID(s):', [COLORS[i % len(COLORS)]['name'] for i in range(max_people)], offset=0) if status == 'OK' else None
-        result_notes = input('Save notes: ') if status == 'Skip' else None
-        return status, result_notes, child_ids
+    @abstractmethod
+    def validate(self, opts, **kwargs):
+        pass
 
+    @abstractmethod
     def add_to_queue(self, row):
-        if not osp.exists(row['data_path']):
-            return row.name, None, None
-        tracking = read_pkl(row['data_path'])
-        a = [x['boxes'].id.max() for x in tracking['data'] if x['boxes'].id is not None]
-        k = int(max(a) if len(a) > 0 else 0) + 1
-        processed = self.video_player.gen_video(row['video_path'], tracking)
-        return row.name, processed, k
+        pass
 
     def run(self):
         df = self.data_handler.get_rows()
@@ -101,42 +99,20 @@ class Annotator:
             idx = row.name
             try:
                 logger.info(f'Processing {row["basename"]} {s}-{t}')
-                _idx, frames, k = tasks[0].result()
+                _idx, frames, _args = tasks[0].result()
                 if not osp.exists(row['video_path']) or not osp.exists(row['data_path']):
                     df = df.drop(idx)
                     tasks.pop(0)
                     tasks.append(self.executor.submit(self.add_to_queue, df.iloc[min(self.queue_size - 1, n)]))
                     continue
                 assert _idx == idx
-                task = self.executor.submit(lambda: self.validate(opts=self.status_types, max_people=k))
+                task = self.executor.submit(lambda: self.validate(opts=self.status_types,**_args))
                 self.video_player.play(f'{v}: ({s}-{t})', frames, done=task.done, counter_text=f'{m-n}/{m}')
-                status, notes, child_ids = task.result()
-                self.data_handler.add(idx, status, notes, child_ids)
+                result = task.result()
+                self.data_handler.add(idx, result)
                 df = df.drop(idx)
                 tasks.pop(0)
                 n = df.shape[0]
                 tasks.append(self.executor.submit(self.add_to_queue, df.iloc[min(self.queue_size-1, n)]))
             except GlobalCommandEvent as gce:
                 self.globals[gce.method].func_ref(*gce.args)
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Annotator')
-    parser.add_argument('--root', type=str, help='Root directory')
-    parser.add_argument('--annotator', type=int, help='Annotator ID', choices=[0, 1])
-    args = parser.parse_args()
-    annotators = {0: 'noa', 1: 'shaked'}
-    root = args.root
-    annotator = args.annotator
-    print('Starting annotator...')
-    program = Annotator(root, f'{annotators[annotator]}.csv', annotator)
-    print('Annotator started. Short guide:')
-    print('1. Choose status: OK, No child, Overlapping, Corrupted video, Skip')
-    print('2. If you typed \'Skip\', you will be asked to save notes.')
-    print('3. If you typed \'OK\', you will be asked to choose child ID(s). You can choose multiple IDs separated by space.')
-    print('4. To exit annotator, type \'-exit\'.')
-    print('5. To revert last action, type \'-revert\'.')
-    print('6. To change video speed, type \'-speed <speed>\'.')
-    print('7. To change video resolution, type \'-resolution <width> <height>\'.')
-    print('8. To restart the video, type \'-reset\'.')
-    program.run()
