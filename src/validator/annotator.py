@@ -22,9 +22,8 @@ class GlobalCommandEvent(Exception):
 
 
 class Annotator:
-    def __init__(self, root, annotations_filename, annotator_id):
+    def __init__(self, root, annotator_id):
         self.root = root
-        self.annotations_filename = annotations_filename
         self.annotator_id = annotator_id
 
         self.status_types = self.init_status_types()
@@ -100,7 +99,7 @@ class Annotator:
             try:
                 logger.info(f'Processing {row["basename"]} {s}-{t}')
                 _idx, frames, _args = tasks[0].result()
-                if not osp.exists(row['video_path']) or not osp.exists(row['data_path']):
+                if not osp.exists(row['video_path']): # TODO: Decide if this case is viable
                     df = df.drop(idx)
                     tasks.pop(0)
                     tasks.append(self.executor.submit(self.add_to_queue, df.iloc[min(self.queue_size - 1, n)]))

@@ -9,8 +9,7 @@ from validator.data_handler import DataHandler
 
 class ChildAnnotationData(DataHandler):
     def __init__(self, annotator_id, annotations_file, annotations_dir, data_dir):
-        super().__init__(annotator_id)
-        self.annotations_file = annotations_file
+        super().__init__(annotator_id, annotations_file)
         self.annotations_dir = annotations_dir
         self.data_dir = data_dir
 

@@ -5,15 +5,17 @@ import numpy as np
 import pandas as pd
 
 from validator.data_handler import DataHandler
+pd.set_option('display.expand_frame_repr', False)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+
 
 
 class SkeletonAnnotationData(DataHandler):
     def __init__(self, annotator_id, test_dir):
-        super().__init__(annotator_id)
         self.test_dir = test_dir
-        self.annotations_file = osp.join(test_dir, 'annotations.csv')
-        self.processed_dir = osp.join(self.test_dir, 'processed')
         self.videos_dir = osp.join(self.test_dir, 'videos')
+        super().__init__(annotator_id, osp.join(test_dir, 'annotations.csv'))
 
     def add(self, idx, ann):
         status, notes = ann['status'], ann['notes']
@@ -25,7 +27,7 @@ class SkeletonAnnotationData(DataHandler):
         if osp.exists(self.annotations_file):
             _df = pd.read_csv(self.annotations_file)
         else:
-            _df = pd.DataFrame(columns=['basename', 'start_frame', 'end_frame', 'fps', 'frame_count', 'status', 'notes', 'timestep', 'segment_name', 'video_path', 'data_path'])
+            _df = pd.DataFrame(columns=['basename', 'start_frame', 'end_frame', 'fps', 'frame_count', 'status', 'notes', 'timestep', 'segment_name', 'video_path'])
         ann = _df['segment_name'].unique()
         files = [osp.splitext(f)[0] for f in os.listdir(self.videos_dir) if osp.splitext(f)[0] not in ann]
         _app = pd.DataFrame(columns=_df.columns)

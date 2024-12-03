@@ -8,12 +8,10 @@ import pandas as pd
 
 
 class DataHandler(ABC):
-    def __init__(self, annotator_id):
+    def __init__(self, annotator_id, annotations_file):
         self.annotator_id = annotator_id
+        self.annotations_file = annotations_file
         self.df = self.collect_annotations()
-        # vs = self.df['start_frame'].unique()
-        # self.group = vs[self.annotator_id::2]
-        # self.idx = self.df[self.df['start_frame'].isin(self.group)].index
         self.to_annotate = self.df[self.df['status'].isna()].index
         self.idx = self.to_annotate[:len(self.to_annotate)//2] if self.annotator_id == 0 else self.to_annotate[len(self.to_annotate)//2:]
         self.save()

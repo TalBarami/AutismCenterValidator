@@ -12,14 +12,14 @@ from validator.data_handler import DataHandler
 from validator.video_player import VideoPlayer
 
 
-class ChildAnnotator(Annotator):
+class SkeletonChildAnnotator(Annotator):
 
     def init_status_types(self):
         return ['OK', 'Child detected as adult', 'Adult detected as child', 'Missing skeleton of the child', 'Mixup', 'Skip']
 
     def init_data_handler(self):
         return SkeletonAnnotationData(annotator_id=self.annotator_id,
-                                      test_dir=osp.join(self.root, 'test'))
+                                      test_dir=osp.join(self.root, 'testing'))
 
     def init_video_player(self):
         return VideoPlayer(osp.join(RESOURCES_ROOT, 'config.json'))
@@ -31,8 +31,6 @@ class ChildAnnotator(Annotator):
         return status, result_notes
 
     def add_to_queue(self, row):
-        if not osp.exists(row['data_path']):
-            return row.name, None, None
         processed = self.video_player.gen_video(row['video_path'])
         return row.name, processed, {}
 
@@ -45,7 +43,7 @@ if __name__ == '__main__':
     root = args.root
     annotator = args.annotator
     print('Starting annotator...')
-    program = ChildAnnotator(root, f'{annotators[annotator]}.csv', annotator)
+    program = SkeletonChildAnnotator(root, annotator)
     print('Annotator started. Short guide:')
     print(f'1. Choose status: {", ".join(program.status_types)}')
     print('2. If you typed \'Skip\', you will be asked to save notes.')

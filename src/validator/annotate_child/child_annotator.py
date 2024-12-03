@@ -11,6 +11,9 @@ from validator.constants import RESOURCES_ROOT
 
 
 class ChildAnnotator(Annotator):
+    def __init__(self, root, annotator_id, annotations_filename):
+        self.annotations_filename = annotations_filename
+        super().__init__(root, annotator_id)
 
     def init_status_types(self):
         return ['OK', 'No child', 'Overlapping', 'Corrupted video', 'Skip']
