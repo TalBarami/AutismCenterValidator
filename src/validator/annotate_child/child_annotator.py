@@ -16,7 +16,7 @@ class ChildAnnotator(Annotator):
         super().__init__(root, annotator_id)
 
     def init_status_types(self):
-        return ['OK', 'No child', 'Overlapping', 'Corrupted video', 'Skip']
+        return ['OK', 'Child present but not detected', 'Overlapping', 'Corrupted video', 'Skip']
 
     def init_data_handler(self):
         return ChildAnnotationData(annotations_file=osp.join(self.root, self.annotations_filename),
@@ -52,7 +52,7 @@ if __name__ == '__main__':
     root = args.root
     annotator = args.annotator
     print('Starting annotator...')
-    program = ChildAnnotator(root, f'{annotators[annotator]}.csv', annotator)
+    program = ChildAnnotator(root, annotator, f'{annotators[annotator]}.csv')
     print('Annotator started. Short guide:')
     print(f'1. Choose status: {", ".join(program.status_types)}')
     print('2. If you typed \'Skip\', you will be asked to save notes.')

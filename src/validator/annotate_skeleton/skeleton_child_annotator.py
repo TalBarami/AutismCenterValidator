@@ -28,7 +28,7 @@ class SkeletonChildAnnotator(Annotator):
         ans = self.choose('Choose status:', opts)
         status = opts[ans[0]]
         result_notes = input('Save notes: ') if status == 'Skip' else None
-        return status, result_notes
+        return {'status': status, 'notes': result_notes}
 
     def add_to_queue(self, row):
         processed = self.video_player.gen_video(row['video_path'])
