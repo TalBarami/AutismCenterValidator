@@ -5,9 +5,7 @@ import numpy as np
 import pandas as pd
 
 from validator.data_handler import DataHandler
-pd.set_option('display.expand_frame_repr', False)
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', None)
+
 
 
 
