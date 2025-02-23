@@ -2,10 +2,15 @@ import atexit
 import signal
 from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
-from enum import Enum
 from os import path as osp
 
+import pandas as pd
+
 from validator.constants import logger
+
+pd.set_option('display.expand_frame_repr', False)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
 
 
 class Global:
