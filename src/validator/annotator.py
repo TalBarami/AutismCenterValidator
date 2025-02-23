@@ -1,3 +1,5 @@
+import atexit
+import signal
 from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
@@ -36,7 +38,10 @@ class Annotator:
                                             Global('speed', 1, self.video_player.set_speed),
                                             Global('resolution', 2, self.video_player.set_resolution),
                                             Global('reset', 0, self.video_player.reset)]}
-        self.queue_size = 3
+        self.queue_size = 6
+        atexit.register(self.data_handler.save)
+        signal.signal(signal.SIGINT, self.exit)
+        signal.signal(signal.SIGTERM, self.exit)
 
     @abstractmethod
     def init_data_handler(self):
@@ -94,18 +99,18 @@ class Annotator:
 
         while not df.empty:
             row = df.iloc[0]
-            v, s, t = row['basename'], row['start_frame'], row['end_frame']
+            v, s, t = row['basename'], row['start'], row['end']
             idx = row.name
             try:
                 logger.info(f'Processing {row["basename"]} {s}-{t}')
                 _idx, frames, _args = tasks[0].result()
-                if not osp.exists(row['video_path']): # TODO: Decide if this case is viable
+                if frames is None:
                     df = df.drop(idx)
                     tasks.pop(0)
                     tasks.append(self.executor.submit(self.add_to_queue, df.iloc[min(self.queue_size - 1, n)]))
                     continue
                 assert _idx == idx
-                task = self.executor.submit(lambda: self.validate(opts=self.status_types,**_args))
+                task = self.executor.submit(lambda: self.validate(opts=self.status_types, **_args))
                 self.video_player.play(f'{v}: ({s}-{t})', frames, done=task.done, counter_text=f'{m-n}/{m}')
                 result = task.result()
                 self.data_handler.add(idx, result)

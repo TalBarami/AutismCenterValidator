@@ -17,7 +17,7 @@ class Resolution(Enum):
 
 
 class VideoPlayer:
-    def __init__(self, cfg_path):
+    def __init__(self, cfg_path, cfg=None):
         self.cfg_path = cfg_path
         self.cfg = read_json(cfg_path)
         self.resolution_method = Resolution.AUTO
@@ -27,6 +27,10 @@ class VideoPlayer:
 
         self.set_speed(self.speed)
         self.set_resolution(*self.resolution)
+
+        self.window_name = 'Video Player'
+        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+        cv2.moveWindow(self.window_name, 0, 0)
 
     def update_cfg(self):
         self.cfg['speed'] = self.speed
@@ -67,7 +71,7 @@ class VideoPlayer:
             if i < 10:
                 self.add_text(frame, 'Reset', 0.5, 0.5, 3, (0, 0, 255), 5)
             self.add_text(frame, f'{i}/{len(frames)}', 0.05, 0.95, 1, (100, 30, 255), 2)
-            cv2.imshow(video_name, frame)
+            cv2.imshow(self.window_name, frame)
             cv2.waitKey(delay)
             i += 1
             if i >= len(frames):
@@ -96,6 +100,35 @@ class VideoPlayer:
             i += 1
         cap.release()
         return np.array(frames)
+
+class AssessmentVideoPlayer(VideoPlayer):
+    def gen_video(self, video_paths):
+        rows, cols = (2, 3) if len(video_paths > 4) else (2, 2)
+        all_vids = []
+        for video_path in video_paths:
+            frames = []
+            cap = cv2.VideoCapture(video_path)
+            i = 0
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                frames.append(frame)
+                i += 1
+            cap.release()
+            all_vids.append(frames)
+        combined_frames = []
+        F = min([len(vid) for vid in all_vids])
+        for frame in range(F):
+            current_frames = [vid[frame] for vid in all_vids]
+            grid_rows = [
+                np.hstack(current_frames[i * cols:(i + 1) * cols]) for i in range(rows)
+            ]
+            combined_frame = np.vstack(grid_rows)
+            combined_frames.append(combined_frame)
+
+        return np.array(combined_frames)
+
 
 
 

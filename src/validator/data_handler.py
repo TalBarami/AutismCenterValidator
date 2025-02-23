@@ -13,7 +13,11 @@ class DataHandler(ABC):
         self.annotations_file = annotations_file
         self.df = self.collect_annotations()
         self.to_annotate = self.df[self.df['status'].isna()].index
-        self.idx = self.to_annotate[:len(self.to_annotate)//2] if self.annotator_id == 0 else self.to_annotate[len(self.to_annotate)//2:]
+        # subset = pd.read_csv(osp.join(self.annotations_dir, '..', 'sample12.csv'))['basename'].unique()
+        # self.to_annotate = self.df[self.df['status'].isna() & self.df['basename'].isin(subset)].index
+        # self.idx = self.to_annotate[:len(self.to_annotate)//2] if self.annotator_id == 0 else self.to_annotate[len(self.to_annotate)//2:]
+
+        self.idx = self.to_annotate
         self.save()
         self.stack = []
 
@@ -22,7 +26,7 @@ class DataHandler(ABC):
         pass
 
     def save(self):
-        self.df = self.df.sort_values(by=['start_frame', 'basename'])
+        self.df = self.df.sort_values(by=['start', 'basename'])
         self.df.to_csv(self.annotations_file, index=False)
 
     def revert(self):
