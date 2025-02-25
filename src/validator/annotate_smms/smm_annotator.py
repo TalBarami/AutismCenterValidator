@@ -4,6 +4,7 @@ import argparse
 
 import numpy as np
 from asdhub.ancan_db.ancan_db import ANCANManager
+from asdhub.constants import USERS_ROOT
 
 from validator.annotate_smms.smm_annotation_data import SMMsAnnotationData
 from validator.annotator import Annotator
@@ -67,8 +68,12 @@ def select_annotator(annotators):
         result = input()
         result = [s for s in result.split(' ') if s]
         if len(result) > 0 and all(s.isdigit() and (offset <= int(s) < len(annotators) + offset) for s in result):
-            result = [int(s) - offset for s in result]
-            return annotators[result[0]]
+            result = [int(s) - offset for s in result][0]
+            print(f'You are identifying as: {annotators[result]} - ARE YOU SURE? y/n')
+            ans = input()
+            if ans == 'y':
+                return annotators[result]
+            continue
         print('Error: Wrong selection.')
 
 if __name__ == '__main__':
@@ -76,7 +81,7 @@ if __name__ == '__main__':
     parser.add_argument('--root', type=str, help='Root directory')
     parser.add_argument('-d', '--debug', action='store_true', help='Debug mode')
     args = parser.parse_args()
-    root = args.root
+    root = osp.join(USERS_ROOT, 'TalBarami', 'smm_project', 'manual_annotations')
     annotators = ['Liora', 'Noa', 'Shaked']
     annotator = select_annotator(annotators)
     print('Starting annotations tool...')
