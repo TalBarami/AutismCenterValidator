@@ -56,8 +56,7 @@ class VideoPlayer:
     def reset(self):
         return
 
-    def play(self, video_name, frames, done=None, counter_text=None):
-        fps = 30
+    def play(self, video_name, frames, fps, done=None, counter_text=None):
         org_resolution = frames.shape[1:3]
         i = 0
         delay = int((1000 / fps / self.speed))
@@ -91,6 +90,7 @@ class VideoPlayer:
     def gen_video(self, video_path):
         cap = cv2.VideoCapture(video_path)
         frames = []
+        fps = cap.get(cv2.CAP_PROP_FPS)
         i = 0
         while True:
             ret, frame = cap.read()
@@ -99,35 +99,47 @@ class VideoPlayer:
             frames.append(frame)
             i += 1
         cap.release()
-        return np.array(frames)
+        return np.array(frames), fps
 
 class AssessmentVideoPlayer(VideoPlayer):
     def gen_video(self, video_paths):
-        rows, cols = (2, 3) if len(video_paths > 4) else (2, 2)
+        rows, cols = (2, 3) if len(video_paths) > 4 else (2, 2)
         all_vids = []
+        fps = []
         for video_path in video_paths:
             frames = []
             cap = cv2.VideoCapture(video_path)
-            i = 0
+            cam_id = osp.basename(video_path).split('_')[-3]
+            fps.append(cap.get(cv2.CAP_PROP_FPS))
             while True:
                 ret, frame = cap.read()
                 if not ret:
                     break
+                cv2.putText(frame, cam_id, (30, 90), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 2)
                 frames.append(frame)
-                i += 1
             cap.release()
             all_vids.append(frames)
-        combined_frames = []
+        fps = np.median(fps)
         F = min([len(vid) for vid in all_vids])
+        target_height, target_width = all_vids[0][0].shape[:2]
+        def get_frame(vid, idx):
+            if idx < len(vid):
+                return cv2.resize(vid[idx], (target_width, target_height))
+            return np.zeros((target_height, target_width, 3), dtype=np.uint8)
+
+        combined_frames = []
         for frame in range(F):
-            current_frames = [vid[frame] for vid in all_vids]
+            current_frames = [get_frame(vid, frame) for vid in all_vids]
+            while len(current_frames) < rows * cols:
+                current_frames.append(np.zeros((target_height, target_width, 3), dtype=np.uint8))
+
             grid_rows = [
                 np.hstack(current_frames[i * cols:(i + 1) * cols]) for i in range(rows)
             ]
             combined_frame = np.vstack(grid_rows)
             combined_frames.append(combined_frame)
 
-        return np.array(combined_frames)
+        return np.array(combined_frames), fps
 
 
 

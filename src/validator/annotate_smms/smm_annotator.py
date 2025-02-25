@@ -3,16 +3,18 @@ from os import path as osp
 import argparse
 
 import numpy as np
+from asdhub.ancan_db.ancan_db import ANCANManager
 
 from validator.annotate_smms.smm_annotation_data import SMMsAnnotationData
 from validator.annotator import Annotator
 from validator.constants import RESOURCES_ROOT
-from validator.video_player import VideoPlayer
+from validator.video_player import VideoPlayer, AssessmentVideoPlayer
 
 
 class SMMAnnotator(Annotator):
     def __init__(self, root, annotator_id, filename, debug=False):
         self.filename = filename
+        self.am = ANCANManager()
         self.smm_types = sorted(['Hand flapping', 'Tapping', 'Clapping', 'Fingers', 'Body rocking',
                           'Tremor', 'Spinning in circle', 'Toe walking', 'Back and forth',
                           'Head movement', 'Playing with object', 'Jumping in place', 'Legs movement', 'Feeling texture', 'Other'])
@@ -27,30 +29,34 @@ class SMMAnnotator(Annotator):
         return SMMsAnnotationData(test_dir=self.root, annotator_id=self.annotator_id, filename=self.filename)
 
     def init_video_player(self):
-        return VideoPlayer(osp.join(RESOURCES_ROOT, 'config.json'))
+        return AssessmentVideoPlayer(osp.join(RESOURCES_ROOT, 'config.json'))
+        # return VideoPlayer(osp.join(RESOURCES_ROOT, 'config.json'))
 
-    def validate(self, opts, score):
+    def validate(self, opts, score, cam_ids, fps):
         ext = f' (score: {score})' if self.debug else ''
         ans = self.choose(f'Choose status:{ext}', opts)
         status = opts[ans[0]]
-        smm_type = self.choose('Choose SMM type(s):', self.smm_types, offset=1) if status == 'SMM' else None
+        smm_type = self.choose('Choose SMM type(s):', self.smm_types, offset=1) if status == 'SMM' else []
+        cameras = self.choose('Choose camera(s):', cam_ids, as_is=True) if status == 'SMM' else []
         notes = input('Save notes: ') if status == 'Skip' else None
-        return {'status': status, 'notes': notes, 'smm_type': smm_type}
+        return {'status': status, 'notes': notes, 'smm_type': [self.smm_types[x] for x in smm_type], 'cameras': [cam_ids[x] for x in cameras], 'fps': fps}
 
     def add_to_queue(self, row):
         # name, start, end = row['assessment'], row['start'], row['end']
-        name, start, end = row['basename'], row['start'], row['end']
-        # cameras = np.arange(6)
-        # filenames = [osp.join(self.data_handler.videos_dir, f'{name}_{c}_{start}_{end}.mp4') for c in cameras]
-        # filenames = [f for f in filenames if osp.exists(f)]
-        # if not filenames:
-        #     return row.name, None, None
-        # frames = self.video_player.gen_video(filenames)
-        filename = osp.join(self.data_handler.videos_dir, f'{name}_{start}_{end}.mp4')
-        if not osp.exists(filename):
+        name, start, end = row['assessment'], row['start'], row['end']
+        df = self.am.for_assessment(name)
+        fps = df['fps'].mode()[0]
+        basenames = df[df['fps'] == fps]['basename']
+        filenames = [osp.join(self.data_handler.videos_dir, f'{b}_{start}_{end}.mp4') for b in basenames]
+        filenames = [f for f in filenames if osp.exists(f)]
+        if not filenames:
             return row.name, None, None
-        frames = self.video_player.gen_video(filename)
-        return row.name, frames, {'score': row['conf_smm']}
+        frames, fps = self.video_player.gen_video(filenames)
+        # filename = osp.join(self.data_handler.videos_dir, f'{name}_{start}_{end}.mp4')
+        # if not osp.exists(filename):
+        #     return row.name, None, None
+        # frames, fps = self.video_player.gen_video(filename)
+        return row.name, frames, fps, {'score': row['conf_smm'], 'cam_ids': [osp.basename(f).split('_')[-3] for f in filenames], 'fps': fps}
 
 def select_annotator(annotators):
     offset = 1

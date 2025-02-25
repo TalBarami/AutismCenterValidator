@@ -26,7 +26,7 @@ class DataHandler(ABC):
         pass
 
     def save(self):
-        self.df = self.df.sort_values(by=['start', 'basename'])
+        # self.df = self.df.sort_values(by=['start', 'assessment'])
         self.df.to_csv(self.annotations_file, index=False)
 
     def revert(self):

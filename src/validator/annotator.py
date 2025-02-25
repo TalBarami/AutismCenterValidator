@@ -72,11 +72,11 @@ class Annotator:
         cmd = str[1:].split(' ')
         return any(g for g in self.globals.values() if len(cmd) == g.args_count + 1 and cmd[0] == g.name)
 
-    def choose(self, msg, lst, offset=1):
+    def choose(self, msg, lst, offset=1, as_is=False):
         while True:
             print(msg)
             for i, e in enumerate(lst):
-                print(f'{i + offset}. {e}')
+                print(e if as_is else f'{i + offset}. {e}')
             result = input()
             if self.valid_global(result):
                 raise GlobalCommandEvent(*result[1:].split(' '))
@@ -104,11 +104,11 @@ class Annotator:
 
         while not df.empty:
             row = df.iloc[0]
-            v, s, t = row['basename'], row['start'], row['end']
+            v, s, t = row['assessment'], row['start'], row['end']
             idx = row.name
             try:
-                logger.info(f'Processing {row["basename"]} {s}-{t}')
-                _idx, frames, _args = tasks[0].result()
+                logger.info(f'Processing {row["assessment"]} {s}-{t}')
+                _idx, frames, fps, _args = tasks[0].result()
                 if frames is None:
                     df = df.drop(idx)
                     tasks.pop(0)
@@ -116,7 +116,7 @@ class Annotator:
                     continue
                 assert _idx == idx
                 task = self.executor.submit(lambda: self.validate(opts=self.status_types, **_args))
-                self.video_player.play(f'{v}: ({s}-{t})', frames, done=task.done, counter_text=f'{m-n}/{m}')
+                self.video_player.play(f'{v}: ({s}-{t})', frames, fps, done=task.done, counter_text=f'{m-n}/{m}')
                 result = task.result()
                 self.data_handler.add(idx, result)
                 df = df.drop(idx)

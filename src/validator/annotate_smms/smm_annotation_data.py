@@ -16,21 +16,20 @@ class SMMsAnnotationData(DataHandler):
         super().__init__(annotator_id=annotator_id, annotations_file=osp.join(self.annotations_dir, f'{annotator_id}.csv'))
 
     def add(self, idx, ann):
-        status, notes, smm_type = ann['status'], ann['notes'], ann['smm_type']
+        status, notes, smm_type, cam_ids, fps = ann['status'], ann['notes'], ann['smm_type'], ann['cameras'], ann['fps']
         self.stack.append(idx)
-        self.df.loc[idx, ['status', 'smm_type', 'notes', 'timestep', 'annotator']] = [status, str(smm_type), notes, pd.Timestamp(datetime.now()), self.annotator_id]
-        if self.i == 10:
-            self.i = 0
-            self.save()
-        self.i += 1
+        self.df.loc[idx, ['status', 'smm_type', 'cameras', 'notes', 'timestep', 'annotator']] = [status, str(smm_type), str(cam_ids), notes, pd.Timestamp(datetime.now()), self.annotator_id]
+        # if self.i == 10:
+        #     self.i = 0
+        self.save()
+        # self.i += 1
 
     def collect_annotations(self):
         if osp.exists(self.annotations_file):
-            df = pd.read_csv(self.annotations_file)
+            df = pd.read_csv(self.annotations_file)[['assessment', 'start', 'end']]
         else:
             df = pd.read_csv(self.base_template)
-            df[['status', 'smm_type', 'notes', 'timestep', 'annotator']] = [None, None, None, None, None]
-        # shuffle df:
-        df = df.sample(frac=1)
-        return df.sort_values(by='basename')
+            df = df.sample(frac=1).sort_values(by='assessment')
+            df[['status', 'smm_type', 'cameras', 'notes', 'timestep', 'annotator']] = [None, None, None, None, None, None]
+        return df
         # return df.sort_values(by=['basename', 'start'])
