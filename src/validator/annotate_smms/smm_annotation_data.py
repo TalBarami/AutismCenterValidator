@@ -26,9 +26,9 @@ class SMMsAnnotationData(DataHandler):
 
     def collect_annotations(self):
         if osp.exists(self.annotations_file):
-            df = pd.read_csv(self.annotations_file)[['assessment', 'start', 'end']]
+            df = pd.read_csv(self.annotations_file)
         else:
-            df = pd.read_csv(self.base_template)
+            df = pd.read_csv(self.base_template)[['assessment', 'start', 'end']]
             df = df.sample(frac=1).sort_values(by='assessment')
             df[['status', 'smm_type', 'cameras', 'notes', 'timestep', 'annotator']] = [None, None, None, None, None, None]
         return df
