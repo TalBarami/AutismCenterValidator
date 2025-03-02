@@ -12,14 +12,16 @@ class DataHandler(ABC):
         self.annotator_id = annotator_id
         self.annotations_file = annotations_file
         self.df = self.collect_annotations()
-        self.to_annotate = self.df[self.df['status'].isna()].index
         # subset = pd.read_csv(osp.join(self.annotations_dir, '..', 'sample12.csv'))['basename'].unique()
         # self.to_annotate = self.df[self.df['status'].isna() & self.df['basename'].isin(subset)].index
         # self.idx = self.to_annotate[:len(self.to_annotate)//2] if self.annotator_id == 0 else self.to_annotate[len(self.to_annotate)//2:]
 
-        self.idx = self.to_annotate
+        self.idx = self.get_indices()
         self.save()
         self.stack = []
+
+    def get_indices(self):
+        return self.df[self.df['status'].isna()].index
 
     @abstractmethod
     def collect_annotations(self):

@@ -51,7 +51,7 @@ class SMMAnnotator(Annotator):
         filenames = [osp.join(self.data_handler.videos_dir, f'{b}_{start}_{end}.mp4') for b in basenames]
         filenames = [f for f in filenames if osp.exists(f)]
         if not filenames:
-            return row.name, None, None
+            return row.name, None, None, None
         frames, fps = self.video_player.gen_video(filenames)
         # filename = osp.join(self.data_handler.videos_dir, f'{name}_{start}_{end}.mp4')
         # if not osp.exists(filename):
