@@ -15,6 +15,14 @@ class SMMsAnnotationData(DataHandler):
         self.i = 0
         super().__init__(annotator_id=annotator_id, annotations_file=osp.join(self.annotations_dir, f'{annotator_id}.csv'))
 
+    def get_indices(self):
+        df = self.df[self.df['status'].isna()].index
+        high = self.df[self.df['group'] == 'high'].index
+        med = self.df[self.df['group'] == 'med'].sample(frac=0.2).index
+        low = self.df[self.df['group'] == 'low'].index
+        return high.union(med).union(low)
+
+
     def add(self, idx, ann):
         status, notes, smm_type, cam_ids, fps = ann['status'], ann['notes'], ann['smm_type'], ann['cameras'], ann['fps']
         self.stack.append(idx)
