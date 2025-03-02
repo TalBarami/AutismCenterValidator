@@ -78,7 +78,6 @@ def select_annotator(annotators):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Annotator')
-    parser.add_argument('--root', type=str, help='Root directory')
     parser.add_argument('-d', '--debug', action='store_true', help='Debug mode')
     args = parser.parse_args()
     root = osp.join(USERS_ROOT, 'TalBarami', 'smm_project', 'manual_annotations')

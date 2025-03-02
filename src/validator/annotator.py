@@ -43,7 +43,7 @@ class Annotator:
                                             Global('speed', 1, self.video_player.set_speed),
                                             Global('resolution', 2, self.video_player.set_resolution),
                                             Global('reset', 0, self.video_player.reset)]}
-        self.queue_size = 6
+        self.queue_size = 3
         atexit.register(self.data_handler.save)
         signal.signal(signal.SIGINT, self.exit)
         signal.signal(signal.SIGTERM, self.exit)
