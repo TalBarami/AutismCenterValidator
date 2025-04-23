@@ -18,14 +18,14 @@ class SkeletonAnnotationData(DataHandler):
     def add(self, idx, ann):
         status, notes = ann['status'], ann['notes']
         self.stack.append(idx)
-        self.df.loc[idx, ['status', 'notes', 'timestep']] = [status, notes, datetime.now()]
+        self.df.loc[idx, ['status', 'notes', 'timestamp']] = [status, notes, datetime.now()]
         self.save()
 
     def collect_annotations(self):
         if osp.exists(self.annotations_file):
             _df = pd.read_csv(self.annotations_file)
         else:
-            _df = pd.DataFrame(columns=['basename', 'start_frame', 'end_frame', 'fps', 'frame_count', 'status', 'notes', 'timestep', 'segment_name', 'video_path'])
+            _df = pd.DataFrame(columns=['basename', 'start_frame', 'end_frame', 'fps', 'frame_count', 'status', 'notes', 'timestamp', 'segment_name', 'video_path'])
         ann = _df['segment_name'].unique()
         files = [osp.splitext(f)[0] for f in os.listdir(self.videos_dir) if osp.splitext(f)[0] not in ann]
         _app = pd.DataFrame(columns=_df.columns)
@@ -35,7 +35,7 @@ class SkeletonAnnotationData(DataHandler):
         _app['end_frame'] = _app['segment_name'].apply(lambda f: f.split('_')[7]).astype(int)
         _app['status'] = np.nan
         _app['notes'] = np.nan
-        _app['timestep'] = np.nan
+        _app['timestamp'] = np.nan
         merged = _app.merge(_df, on=['basename', 'start_frame', 'end_frame'], how='inner', suffixes=('', '_duplicate'))
         common_indices = merged.index
         df = _app.drop(common_indices)

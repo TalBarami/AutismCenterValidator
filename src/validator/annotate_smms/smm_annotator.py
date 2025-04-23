@@ -30,34 +30,31 @@ class SMMAnnotator(Annotator):
         return SMMsAnnotationData(test_dir=self.root, annotator_id=self.annotator_id, filename=self.filename)
 
     def init_video_player(self):
-        return AssessmentVideoPlayer(osp.join(RESOURCES_ROOT, 'config.json'))
-        # return VideoPlayer(osp.join(RESOURCES_ROOT, 'config.json'))
+        return VideoPlayer(osp.join(RESOURCES_ROOT, 'config.json'))
 
-    def validate(self, opts, score, cam_ids, fps):
+    def validate(self, opts, score):
         ext = f' (score: {score})' if self.debug else ''
         ans = self.choose(f'Choose status:{ext}', opts)
         status = opts[ans[0]]
         smm_type = self.choose('Choose SMM type(s):', self.smm_types, offset=1) if status == 'SMM' else []
-        cameras = self.choose('Choose camera(s):', cam_ids, as_is=True) if status == 'SMM' else []
         notes = input('Save notes: ') if status == 'Skip' else None
-        return {'status': status, 'notes': notes, 'smm_type': [self.smm_types[x] for x in smm_type], 'cameras': [cam_ids[x] for x in cameras], 'fps': fps}
+        return {'status': status, 'notes': notes, 'smm_type': [self.smm_types[x] for x in smm_type]}
 
     def add_to_queue(self, row):
-        # name, start, end = row['assessment'], row['start'], row['end']
         name, start, end = row['assessment'], row['start'], row['end']
-        df = self.am.for_assessment(name)
-        fps = df['fps'].mode()[0]
-        basenames = df[df['fps'] == fps]['basename']
-        filenames = [osp.join(self.data_handler.videos_dir, f'{b}_{start}_{end}.mp4') for b in basenames]
-        filenames = [f for f in filenames if osp.exists(f)]
-        if not filenames:
-            return row.name, None, None, None
-        frames, fps = self.video_player.gen_video(filenames)
-        # filename = osp.join(self.data_handler.videos_dir, f'{name}_{start}_{end}.mp4')
-        # if not osp.exists(filename):
-        #     return row.name, None, None
-        # frames, fps = self.video_player.gen_video(filename)
-        return row.name, frames, fps, {'score': row['conf_smm'], 'cam_ids': [osp.basename(f).split('_')[-3] for f in filenames], 'fps': fps}
+        if row['group'] == 'low':
+            cam_ids = [i for i in np.arange(1, 6) if str(i) in row.keys()]
+            cam_id = np.random.choice(cam_ids, 1)[0]
+        else:
+            cam_id = row['cam_id']
+        df = self.am.for_assessment(name).copy()
+        df['cam_id'] = df['basename'].apply(lambda b: int(b.split('_')[-1]))
+        fname = df[df['cam_id'] == cam_id]['basename'].values[0]
+        filename = osp.join(self.data_handler.videos_dir, f'{fname}_{start}_{end}.mp4')
+        if not osp.exists(filename):
+            return row.name, None, None
+        frames, fps = self.video_player.gen_video(filename)
+        return row.name, frames, fps, {'score': row['conf_smm']}
 
 def select_annotator(annotators):
     offset = 1

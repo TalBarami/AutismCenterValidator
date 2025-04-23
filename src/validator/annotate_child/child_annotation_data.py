@@ -16,14 +16,14 @@ class ChildAnnotationData(DataHandler):
     def add(self, idx, ann):
         status, notes, child_ids = ann['status'], ann['notes'], ann['child_ids']
         self.stack.append(idx)
-        self.df.loc[idx, ['status', 'notes', 'child_ids', 'timestep']] = [status, notes, str(child_ids), datetime.now()]
+        self.df.loc[idx, ['status', 'notes', 'child_ids', 'timestamp']] = [status, notes, str(child_ids), datetime.now()]
         self.save()
 
     def collect_annotations(self):
         if osp.exists(self.annotations_file):
             _df = pd.read_csv(self.annotations_file)
         else:
-            _df = pd.DataFrame(columns=['basename', 'start_frame', 'end_frame', 'fps', 'frame_count', 'status', 'notes', 'child_ids', 'timestep', 'segment_name', 'video_path', 'data_path'])
+            _df = pd.DataFrame(columns=['basename', 'start_frame', 'end_frame', 'fps', 'frame_count', 'status', 'notes', 'child_ids', 'timestamp', 'segment_name', 'video_path', 'data_path'])
         ann = _df['basename'].unique()
         files = [osp.join(self.annotations_dir, f) for f in os.listdir(self.annotations_dir) if '_'.join(f.split('_')[:6]) not in ann]
         _app = pd.concat([pd.read_csv(f) for f in files])
@@ -32,7 +32,7 @@ class ChildAnnotationData(DataHandler):
         _app['status'] = np.nan
         _app['notes'] = np.nan
         _app['child_ids'] = np.nan
-        _app['timestep'] = np.nan
+        _app['timestamp'] = np.nan
         _app['segment_name'] = _app.apply(lambda row: f"{row['basename']}_{row['start_frame']}_{row['end_frame']}", axis=1)
         # _app['video_path'] = _app['segment_name'].apply(lambda s: osp.join(self.data_dir, f'{s}.mp4'))
         # _app['data_path'] = _app['segment_name'].apply(lambda s: osp.join(self.data_dir, f'{s}.pkl'))
