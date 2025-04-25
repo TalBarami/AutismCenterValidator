@@ -52,7 +52,7 @@ class SMMAnnotator(Annotator):
         fname = df[df['cam_id'] == cam_id]['basename'].values[0]
         filename = osp.join(self.data_handler.videos_dir, f'{fname}_{start}_{end}.mp4')
         if not osp.exists(filename):
-            return row.name, None, None
+            return row.name, None, None, {}
         frames, fps = self.video_player.gen_video(filename)
         return row.name, frames, fps, {'score': row['conf_smm']}
 
