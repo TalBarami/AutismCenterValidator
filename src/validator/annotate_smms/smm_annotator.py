@@ -49,9 +49,13 @@ class SMMAnnotator(Annotator):
             cam_id = row['cam_id']
         df = self.am.for_assessment(name).copy()
         df['cam_id'] = df['basename'].apply(lambda b: int(b.split('_')[-1]))
-        fname = df[df['cam_id'] == cam_id]['basename'].values[0]
+        fname = df[df['cam_id'] == cam_id]['basename']
+        if fname.empty:
+            print(f'No video found for {name} {cam_id}')
+            return row.name, None, None, {}
         filename = osp.join(self.data_handler.videos_dir, f'{fname}_{start}_{end}.mp4')
         if not osp.exists(filename):
+            print(f'Video not found: {filename}')
             return row.name, None, None, {}
         frames, fps = self.video_player.gen_video(filename)
         return row.name, frames, fps, {'score': row['conf_smm']}
