@@ -42,17 +42,18 @@ class SMMAnnotator(Annotator):
 
     def add_to_queue(self, row):
         name, start, end = row['assessment'], row['start'], row['end']
+        df = self.am.for_assessment(name).copy()
+        df['cam_id'] = df['basename'].apply(lambda b: int(b.split('_')[-1]))
         if row['group'] == 'low':
-            cam_ids = [i for i in np.arange(1, 6) if str(i) in row.keys()]
+            cam_ids = df['cam_id'].unique()
             cam_id = np.random.choice(cam_ids, 1)[0]
         else:
             cam_id = row['cam_id']
-        df = self.am.for_assessment(name).copy()
-        df['cam_id'] = df['basename'].apply(lambda b: int(b.split('_')[-1]))
         fname = df[df['cam_id'] == cam_id]['basename']
         if fname.empty:
             print(f'No video found for {name} {cam_id}')
             return row.name, None, None, {}
+        fname = fname.iloc[0]
         filename = osp.join(self.data_handler.videos_dir, f'{fname}_{start}_{end}.mp4')
         if not osp.exists(filename):
             print(f'Video not found: {filename}')
