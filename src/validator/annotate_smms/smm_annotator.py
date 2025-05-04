@@ -59,6 +59,8 @@ class SMMAnnotator(Annotator):
             print(f'Video not found: {filename}')
             return row.name, None, None, {}
         frames, fps = self.video_player.gen_video(filename)
+        if len(frames) == 0:
+            return row.name, None, None, {}
         return row.name, frames, fps, {'score': row['conf_smm']}
 
 def select_annotator(annotators):
