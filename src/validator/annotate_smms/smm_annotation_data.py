@@ -7,12 +7,15 @@ from validator.data_handler import DataHandler
 
 
 class SMMsAnnotationData(DataHandler):
-    def __init__(self, annotator_id, test_dir, filename):
+    def __init__(self, annotator_id, test_dir, filename, qa=None):
         self.test_dir = test_dir
         self.videos_dir = osp.join(self.test_dir, 'videos')
         self.annotations_dir = osp.join(self.test_dir, 'annotations')
         self.base_template = osp.join(self.test_dir, filename)
         self.i = 0
+        self.qa = qa
+        if self.qa is not None:
+            annotator_id = f'{annotator_id}_qa'
         super().__init__(annotator_id=annotator_id, annotations_file=osp.join(self.annotations_dir, f'{annotator_id}.csv'))
 
     # def get_indices(self):
@@ -21,6 +24,19 @@ class SMMsAnnotationData(DataHandler):
     #     med = df[df['group'] == 'med'].sample(frac=0.2).index
     #     low = df[df['group'] == 'low'].sample(frac=0.1).index
     #     return high.union(med).union(low)
+    def get_indices(self):
+        if self.qa is not None:
+            def idxs(df):
+                y_true = df['status'] == 'SMM'
+                y_pred = df['conf_smm'] > 0.7
+                idx = df[~df['status'].isna() & (y_true != y_pred)].index
+                return idx
+
+            df1 = pd.read_csv(osp.join(self.annotations_dir, f'{self.qa[0]}.csv'))
+            df2 = pd.read_csv(osp.join(self.annotations_dir, f'{self.qa[1]}.csv'))
+            idx = idxs(df1).union(idxs(df2))
+            return idx
+        return super().get_indices()
 
     def add(self, idx, ann):
         status, notes, smm_type = ann['status'], ann['notes'], ann['smm_type']
