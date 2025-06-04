@@ -13,7 +13,7 @@ from validator.video_player import VideoPlayer, AssessmentVideoPlayer
 
 
 class SMMAnnotator(Annotator):
-    def __init__(self, root, annotator_id, filename, debug=False, qa=False):
+    def __init__(self, root, annotator_id, filename, debug=False, qa=False, ann_type=True):
         self.filename = filename
         self.am = ANCANManager()
         self.smm_types = sorted(['Hand flapping', 'Tapping', 'Clapping', 'Fingers', 'Body rocking',
@@ -22,10 +22,11 @@ class SMMAnnotator(Annotator):
 
         self.debug = debug
         self.qa = qa
+        self.ann_type = ann_type
         super().__init__(root, annotator_id)
 
     def init_status_types(self):
-        return ['SMM', 'No Action', 'Corrupted Video', 'Skip']
+        return ['SMM', 'Repetitive (Non-SMM)', 'No Action', 'Corrupted Video', 'Skip']
 
     def init_data_handler(self):
         return SMMsAnnotationData(test_dir=self.root, annotator_id=self.annotator_id, filename=self.filename, qa=['Noa', 'Shaked'] if self.qa else None)
@@ -35,11 +36,11 @@ class SMMAnnotator(Annotator):
 
     def validate(self, opts, score):
         ext = f' (score: {score})' if self.debug else ''
-        if self.qa:
-            ext += f' (Model: {1 if score > 0.7 else 0}, Annotators: {1 if score < 0.7 else 0})'
+        # if self.qa:
+        #     ext += f' (Model: {1 if score > 0.7 else 0}, Annotators: {1 if score < 0.7 else 0})'
         ans = self.choose(f'Choose status:{ext}', opts)
         status = opts[ans[0]]
-        smm_type = self.choose('Choose SMM type(s):', self.smm_types, offset=1) if status == 'SMM' else []
+        smm_type = self.choose('Choose SMM type(s):', self.smm_types, offset=1) if (self.ann_type and status == 'SMM') else []
         notes = input('Save notes: ') if status == 'Skip' else None
         return {'status': status, 'notes': notes, 'smm_type': [self.smm_types[x] for x in smm_type]}
 
@@ -92,7 +93,7 @@ if __name__ == '__main__':
     annotators = ['Liora', 'Noa', 'Shaked']
     annotator = select_annotator(annotators)
     print('Starting annotations tool...')
-    program = SMMAnnotator(root, annotator, filename='annotations_test14.csv', debug=args.debug, qa=args.qa)
+    program = SMMAnnotator(root, annotator, filename='annotations_test14.csv', debug=args.debug, qa=args.qa, ann_type=annotator!='Liora')
     print(f'Welcome {annotator}! Here\'s a Short guide for you:')
     print(f'1. Choose status: {", ".join(program.status_types)}')
     print('2. If you typed \'Skip\', you will be asked to save notes.')
