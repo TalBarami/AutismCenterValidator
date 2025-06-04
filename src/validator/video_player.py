@@ -98,6 +98,8 @@ class VideoPlayer:
                 break
             frames.append(frame)
             i += 1
+            if i > 3000:
+                break
         cap.release()
         return np.array(frames), fps
 
