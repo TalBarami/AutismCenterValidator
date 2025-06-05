@@ -4,6 +4,7 @@ from abc import abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from os import path as osp
 
+import cv2
 import pandas as pd
 
 from validator.constants import logger
@@ -64,6 +65,7 @@ class Annotator:
     def exit(self):
         self.data_handler.save()
         self.video_player.update_cfg()
+        cv2.destroyAllWindows()
         exit(0)
 
     def valid_global(self, str):
