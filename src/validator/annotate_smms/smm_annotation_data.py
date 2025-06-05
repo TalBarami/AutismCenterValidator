@@ -18,12 +18,6 @@ class SMMsAnnotationData(DataHandler):
             annotator_id = f'{annotator_id}_qa'
         super().__init__(annotator_id=annotator_id, annotations_file=osp.join(self.annotations_dir, f'{annotator_id}.csv'))
 
-    # def get_indices(self):
-    #     df = self.df[self.df['status'].isna()]
-    #     high = df[df['group'] == 'high'].index
-    #     med = df[df['group'] == 'med'].sample(frac=0.2).index
-    #     low = df[df['group'] == 'low'].sample(frac=0.1).index
-    #     return high.union(med).union(low)
     def get_indices(self):
         if self.qa is not None:
             def idxs(df):
@@ -39,16 +33,18 @@ class SMMsAnnotationData(DataHandler):
         return super().get_indices()
 
     def add(self, idx, ann):
-        status, notes, smm_type = ann['status'], ann['notes'], ann['smm_type']
+        status, notes, smm_type, video = ann['status'], ann['notes'], ann['smm_type'], ann['video']
         self.stack.append(idx)
-        self.df.loc[idx, ['status', 'smm_type', 'notes', 'timestamp', 'annotator']] = [status, str(smm_type), notes, pd.Timestamp(datetime.now()), self.annotator_id]
+        self.df.loc[idx, ['status', 'smm_type', 'notes', 'video', 'timestamp', 'annotator']] = [status, str(smm_type), notes, video, pd.Timestamp(datetime.now()), self.annotator_id]
         self.save()
 
     def collect_annotations(self):
         if osp.exists(self.annotations_file):
             df = pd.read_csv(self.annotations_file)
+            if 'video' not in df.columns:
+                df['video'] = None
         else:
             df = pd.read_csv(self.base_template)
-            df[['status', 'smm_type', 'notes', 'timestamp', 'annotator']] = [None, None, None, None, None]
+            df[['status', 'smm_type', 'notes', 'timestamp', 'annotator', 'video']] = [None, None, None, None, None, None]
             df = df.sample(frac=1, random_state=42).reset_index(drop=True)
         return df

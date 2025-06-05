@@ -33,7 +33,7 @@ class SMMAnnotator(Annotator):
     def init_video_player(self):
         return VideoPlayer(osp.join(RESOURCES_ROOT, 'config.json'))
 
-    def validate(self, opts, score):
+    def validate(self, opts, score, video):
         ext = f' (score: {score})' if self.debug else ''
         if self.qa:
             ext += f' (Model: {1 if score > 0.7 else 0}, Annotators: {1 if score < 0.7 else 0})'
@@ -41,7 +41,7 @@ class SMMAnnotator(Annotator):
         status = opts[ans[0]]
         smm_type = self.choose('Choose SMM type(s):', self.smm_types, offset=1) if status == 'SMM' else []
         notes = input('Save notes: ') if status == 'Skip' else None
-        return {'status': status, 'notes': notes, 'smm_type': [self.smm_types[x] for x in smm_type]}
+        return {'status': status, 'notes': notes, 'smm_type': [self.smm_types[x] for x in smm_type], 'video': video}
 
     def add_to_queue(self, row):
         name, start, end = row['assessment'], row['start'], row['end']
@@ -64,7 +64,7 @@ class SMMAnnotator(Annotator):
         frames, fps = self.video_player.gen_video(filename)
         if len(frames) == 0:
             return row.name, None, None, {}
-        return row.name, frames, fps, {'score': row['conf_smm']}
+        return row.name, frames, fps, {'score': row['conf_smm'], 'video': fname}
 
 def select_annotator(annotators):
     offset = 1
@@ -89,7 +89,7 @@ if __name__ == '__main__':
     parser.add_argument('-qa', '--qa', action='store_true', help='QA mode')
     args = parser.parse_args()
     root = osp.join(USERS_ROOT, 'TalBarami', 'smm_project', 'manual_annotations')
-    annotators = ['Liora', 'Noa', 'Shaked']
+    annotators = ['Liora', 'Noa', 'Shaked', 'Tal']
     annotator = select_annotator(annotators)
     print('Starting annotations tool...')
     program = SMMAnnotator(root, annotator, filename='annotations_test14.csv', debug=args.debug, qa=args.qa)
